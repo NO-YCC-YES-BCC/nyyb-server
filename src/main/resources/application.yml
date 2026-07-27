@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: nyyb-server        # 앱 이름
+
+  profiles:
+    active: local            # 기본 프로파일
+
+  jpa:
+    hibernate:
+      ddl-auto: validate     # 스키마 검증만 (운영)
+    properties:
+      hibernate:
+        format_sql: true     # SQL 포맷 정렬
+    open-in-view: false      # OSIV 비활성화
+
+# 데이터소스는 프로파일별 파일 또는 환경변수로 주입
