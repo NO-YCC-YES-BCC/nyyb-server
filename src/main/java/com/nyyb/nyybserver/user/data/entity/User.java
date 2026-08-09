@@ -40,7 +40,7 @@ public class User {
     private String email;
 
     @Column(nullable = false)
-    private String nickname;
+    private String name;
 
     @Column
     private String profileImageUrl;
@@ -61,4 +61,25 @@ public class User {
     @LastModifiedDate
     @Column
     private LocalDateTime modifiedAt;
+
+    public static User ofSocial(AuthProvider provider, String providerId, String email,
+                                String name, String profileImageUrl) {
+        return User.builder()
+                .provider(provider)
+                .providerId(providerId)
+                .email(email)
+                .name(name)
+                .profileImageUrl(profileImageUrl)
+                .role(UserRole.USER)
+                .build();
+    }
+
+    public void syncProfile(String name, String profileImageUrl) {
+        if (name != null) {
+            this.name = name;
+        }
+        if (profileImageUrl != null) {
+            this.profileImageUrl = profileImageUrl;
+        }
+    }
 }
