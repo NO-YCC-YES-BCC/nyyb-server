@@ -6,8 +6,8 @@ import lombok.*;
 
 @Getter
 @Builder
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@NoArgsConstructor
+@AllArgsConstructor
 @Entity
 @Table(name = "ingredient")
 public class Ingredient {
@@ -18,6 +18,9 @@ public class Ingredient {
 
     @Column(nullable = false)
     private String name; // 예: Vitamin C
+
+    @Column
+    private String functionalGroup; // 보습, 각질제거, 미백 등 역할 (LLM 분류 후 고정)
 
     @Column(nullable = false)
     @Builder.Default
