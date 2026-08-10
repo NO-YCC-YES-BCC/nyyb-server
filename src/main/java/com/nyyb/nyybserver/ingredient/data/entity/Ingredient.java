@@ -16,11 +16,8 @@ public class Ingredient {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 1000)
     private String name; // 예: Vitamin C
-
-    @Column
-    private String functionalGroup; // 보습, 각질제거, 미백 등 역할 (LLM 분류 후 고정)
 
     @Column(nullable = false)
     @Builder.Default
