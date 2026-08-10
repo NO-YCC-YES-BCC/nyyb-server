@@ -9,6 +9,7 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Getter
 @Builder
@@ -29,30 +30,30 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(unique = true)
+    private Long kakaoId;
+
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "varchar(20)")
     private AuthProvider provider;
 
     @Column(name = "provider_id", nullable = false)
     private String providerId;
 
-    @Column
-    private String email;
-
     @Column(nullable = false)
-    private String name;
-
-    @Column
-    private String profileImageUrl;
+    private String nickname;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "varchar(20)")
     @Builder.Default
     private UserRole role = UserRole.USER;
 
-    @Column(nullable = false)
+    @Column(name = "notify_kakao", nullable = false)
     @Builder.Default
     private Boolean notifyKakao = false;
+
+    @Column(name = "merged_to_user_id")
+    private Long mergedToUserId;
 
     @CreatedDate
     @Column(updatable = false)
@@ -62,24 +63,48 @@ public class User {
     @Column
     private LocalDateTime modifiedAt;
 
-    public static User ofSocial(AuthProvider provider, String providerId, String email,
-                                String name, String profileImageUrl) {
+    public static User ofSocial(AuthProvider provider, Long kakaoId, String providerId, String nickname) {
         return User.builder()
+                .kakaoId(kakaoId)
                 .provider(provider)
                 .providerId(providerId)
-                .email(email)
-                .name(name)
-                .profileImageUrl(profileImageUrl)
+                .nickname(nickname)
                 .role(UserRole.USER)
                 .build();
     }
 
-    public void syncProfile(String name, String profileImageUrl) {
-        if (name != null) {
-            this.name = name;
-        }
-        if (profileImageUrl != null) {
-            this.profileImageUrl = profileImageUrl;
-        }
+    public static User ofGuest() {
+        String guestId = UUID.randomUUID().toString();
+        return User.builder()
+                .provider(AuthProvider.GUEST)
+                .providerId(guestId)
+                .nickname("Guest")
+                .role(UserRole.GUEST)
+                .build();
+    }
+
+    public boolean isGuest() {
+        return provider == AuthProvider.GUEST;
+    }
+
+    public boolean isMergedGuest() {
+        return mergedToUserId != null;
+    }
+
+    public void connectSocial(AuthProvider provider, Long kakaoId, String providerId, String nickname) {
+        this.provider = provider;
+        this.kakaoId = kakaoId;
+        this.providerId = providerId;
+        this.nickname = nickname;
+        this.role = UserRole.USER;
+        this.mergedToUserId = null;
+    }
+
+    public void syncProfile(String nickname) {
+        this.nickname = nickname;
+    }
+
+    public void mergeTo(User targetUser) {
+        this.mergedToUserId = targetUser.getId();
     }
 }

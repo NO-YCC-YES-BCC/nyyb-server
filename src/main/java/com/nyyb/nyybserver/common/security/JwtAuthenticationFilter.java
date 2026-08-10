@@ -1,4 +1,0 @@
-package com.nyyb.nyybserver.common.security;
-
-public class JwtAuthenticationFilter {
-}
