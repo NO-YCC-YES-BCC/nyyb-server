@@ -14,4 +14,5 @@ public class AuthTokens {
     private String refreshToken;
     private String grantType;
     private Long expiresIn;
+
 }

@@ -9,6 +9,7 @@ public class SocialUserInfoDto {
     private Long id;
     private String nickname;
 
+
     public SocialUserInfoDto(Long id, String nickname, String email) {
         this.id = id;
         this.nickname = nickname;

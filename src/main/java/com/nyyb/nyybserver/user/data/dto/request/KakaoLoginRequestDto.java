@@ -7,7 +7,6 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor
 public class KakaoLoginRequestDto {
-
     @Schema(description = "Kakao authorization code", example = "authorization-code-from-kakao")
     private String code;
 }

@@ -83,7 +83,6 @@ public class JwtTokenProvider {
         if (bytes.length >= 32) {
             return bytes;
         }
-
         try {
             return MessageDigest.getInstance("SHA-256").digest(bytes);
         } catch (NoSuchAlgorithmException e) {

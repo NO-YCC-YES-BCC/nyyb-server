@@ -186,7 +186,6 @@ public class KakaoService {
             @JsonProperty("access_token") String accessToken
     ) {
     }
-
     private record KakaoUserInfoResponse(
             Long id,
             Map<String, Object> properties,

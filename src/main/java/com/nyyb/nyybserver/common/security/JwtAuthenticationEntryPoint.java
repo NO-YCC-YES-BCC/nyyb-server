@@ -21,7 +21,6 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
     public JwtAuthenticationEntryPoint(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
-
     @Override
     public void commence(
             HttpServletRequest request,
