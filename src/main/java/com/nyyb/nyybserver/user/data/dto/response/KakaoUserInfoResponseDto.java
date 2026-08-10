@@ -19,7 +19,7 @@ public class KakaoUserInfoResponseDto {
 
     @Getter
     @NoArgsConstructor
-    public static class kakaoAccount {
+    public static class KakaoAccount {
         private String email;
         private Profile profile;
     }
