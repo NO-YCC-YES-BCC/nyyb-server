@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/auth")
 @Tag(name = "Auth", description = "Guest and Kakao social login APIs")
 public class UserController {
-
     private final KakaoService kakaoService;
 
     @Operation(summary = "Create guest JWT", description = "Creates a guest user and returns JWT tokens.")

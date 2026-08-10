@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Configuration;
 public class SwaggerConfiguration {
     private static final String SECURITY_SCHEME_NAME = "bearerAuth";
 
+
     @Bean
     public OpenAPI openAPI() {
         Info info = new Info()

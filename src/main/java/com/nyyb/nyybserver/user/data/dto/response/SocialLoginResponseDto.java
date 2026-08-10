@@ -16,7 +16,6 @@ public class SocialLoginResponseDto {
     public SocialLoginResponseDto(Long id, String nickname, AuthTokens token) {
         this(id, nickname, false, null, token);
     }
-
     public SocialLoginResponseDto(Long id, String nickname, boolean guest, Long linkedGuestUserId, AuthTokens token) {
         this.id = id;
         this.nickname = nickname;

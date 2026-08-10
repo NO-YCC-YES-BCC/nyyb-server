@@ -10,4 +10,5 @@ public class KakaoTokenResponseDto {
     private String token_type;
     private String refresh_token;
     private Integer expires_in;
+
 }
