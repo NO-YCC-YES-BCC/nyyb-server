@@ -13,4 +13,11 @@ spring:
         format_sql: true     # SQL 포맷 정렬
     open-in-view: false      # OSIV 비활성화
 
+  servlet:
+    multipart:
+      max-file-size: 10MB    # 업로드 이미지 최대 크기
+      max-request-size: 10MB
+
+# CLOVA OCR 값(api-url, secret-key)은 프로파일별 파일에서 주입
+
 # 데이터소스는 프로파일별 파일 또는 환경변수로 주입
