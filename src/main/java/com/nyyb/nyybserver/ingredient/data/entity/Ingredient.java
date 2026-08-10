@@ -19,9 +19,6 @@ public class Ingredient {
     @Column(nullable = false)
     private String name; // 예: Vitamin C
 
-    @Column
-    private String functionalGroup; // 보습, 각질제거, 미백 등 역할 (LLM 분류 후 고정)
-
     @Column(nullable = false)
     @Builder.Default
     private Boolean isToxic = false;
