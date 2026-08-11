@@ -6,10 +6,12 @@ import com.nyyb.nyybserver.common.security.JwtTokenProvider;
 import com.nyyb.nyybserver.user.data.dto.response.SocialLoginResponseDto;
 import com.nyyb.nyybserver.user.data.entity.User;
 import com.nyyb.nyybserver.user.data.enums.AuthProvider;
+import com.nyyb.nyybserver.common.response.ErrorCode;
+import com.nyyb.nyybserver.user.data.exception.OAuthProcessException;
 import com.nyyb.nyybserver.user.data.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,12 +19,12 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -51,12 +53,12 @@ public class KakaoService {
     @Transactional
     public SocialLoginResponseDto kakaoLogin(String code, Long guestUserId) {
         if (!StringUtils.hasText(code)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Kakao authorization code is required.");
+            throw new OAuthProcessException();
         }
 
         KakaoTokenResponse tokenResponse = requestAccessToken(code);
         if (tokenResponse == null || !StringUtils.hasText(tokenResponse.accessToken())) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Kakao token response is empty.");
+            throw new OAuthProcessException(ErrorCode.KAKAO_API_FAILED);
         }
 
         KakaoUserResponse kakaoUser = requestUserInfo(tokenResponse.accessToken());
@@ -127,11 +129,8 @@ public class KakaoService {
                     .retrieve()
                     .body(KakaoTokenResponse.class);
         } catch (RestClientResponseException e) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Kakao authorization code is invalid or expired.",
-                    e
-            );
+            log.warn("Kakao authorization code is invalid or expired.", e);
+            throw new OAuthProcessException();
         }
     }
 
@@ -144,15 +143,12 @@ public class KakaoService {
                     .retrieve()
                     .body(KakaoUserInfoResponse.class);
         } catch (RestClientResponseException e) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_GATEWAY,
-                    "Failed to request Kakao user info.",
-                    e
-            );
+            log.error("Failed to request Kakao user info.", e);
+            throw new OAuthProcessException(ErrorCode.KAKAO_API_FAILED);
         }
 
         if (response == null || response.id() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Kakao user response is empty.");
+            throw new OAuthProcessException(ErrorCode.KAKAO_API_FAILED);
         }
 
         String nickname = extractNickname(response);
