@@ -36,9 +36,6 @@ public class Product {
     @Column(columnDefinition = "TEXT")
     private String ocrText; // OCR 원문
 
-    @Column
-    private Integer seq; // 업로드 순서
-
     // ── [3. 제안 / 4. 설정] 루틴 단계에서 채워짐 (저장 전 null) ──
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "routine_id")
