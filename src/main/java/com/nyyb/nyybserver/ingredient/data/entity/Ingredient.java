@@ -4,6 +4,9 @@ import com.nyyb.nyybserver.ingredient.data.enums.RiskLevel;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Getter
 @Builder
 @NoArgsConstructor
@@ -29,4 +32,9 @@ public class Ingredient {
 
     @Column(columnDefinition = "TEXT")
     private String description; // 성분 가이드 설명
+
+    // 이명 - 매칭 시 name과 함께 키워드로 사용
+    @OneToMany(mappedBy = "ingredient", fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<IngredientAlias> aliases = new ArrayList<>();
 }
