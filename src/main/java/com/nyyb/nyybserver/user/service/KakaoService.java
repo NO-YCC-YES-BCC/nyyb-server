@@ -3,6 +3,7 @@ package com.nyyb.nyybserver.user.service;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.nyyb.nyybserver.common.security.AuthTokens;
 import com.nyyb.nyybserver.common.security.JwtTokenProvider;
+import com.nyyb.nyybserver.user.data.dto.response.KakaoNotificationResponseDto;
 import com.nyyb.nyybserver.user.data.dto.response.SocialLoginResponseDto;
 import com.nyyb.nyybserver.user.data.entity.User;
 import com.nyyb.nyybserver.user.data.enums.AuthProvider;
@@ -198,5 +199,23 @@ public class KakaoService {
             String providerId,
             String nickname
     ) {
+    }
+
+    @Transactional
+    public void updateKakaoNotification(Long userId, boolean enabled) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        user.updateKakaoNotification(enabled);
+    }
+
+    @Transactional(readOnly = true)
+    public KakaoNotificationResponseDto getKakaoNotification(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        return new KakaoNotificationResponseDto(user.getNotifyKakao());
     }
 }
