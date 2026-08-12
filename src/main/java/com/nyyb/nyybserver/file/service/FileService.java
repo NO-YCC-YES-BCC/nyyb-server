@@ -1,5 +1,6 @@
-package com.nyyb.nyybserver.common.s3;
+package com.nyyb.nyybserver.file.service;
 
+import com.nyyb.nyybserver.file.data.exception.ImageUploadException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,7 +21,7 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class S3Service {
+public class FileService {
 
     private static final Duration PRESIGNED_URL_EXPIRATION = Duration.ofMinutes(30);
 

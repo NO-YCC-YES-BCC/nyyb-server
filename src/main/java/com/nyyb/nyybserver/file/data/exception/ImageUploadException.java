@@ -1,4 +1,4 @@
-package com.nyyb.nyybserver.common.s3;
+package com.nyyb.nyybserver.file.data.exception;
 
 import com.nyyb.nyybserver.common.response.ErrorCode;
 import com.nyyb.nyybserver.common.response.GlobalException;
