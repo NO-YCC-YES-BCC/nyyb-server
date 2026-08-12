@@ -26,12 +26,14 @@ public class Routine {
     @JdbcTypeCode(SqlTypes.CHAR)
     private UUID id; // = routineId
 
+    // nullable: 게스트는 null, claim 시 채움
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id")
     private User user;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "analysis_id")
+    // 분석 1개 : 루틴 0..1 (단일 플로우) — 한 분석당 루틴 최대 1개 보장
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "analysis_id", unique = true)
     private Analysis analysis;
 
     @Column

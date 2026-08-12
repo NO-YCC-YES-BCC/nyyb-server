@@ -34,6 +34,7 @@ public enum ErrorCode {
     KAKAO_API_FAILED("C5022", "카카오 API 호출에 실패했습니다.", 502),
 
     // 500
+    IMAGE_UPLOAD_FAILED("C5001", "이미지 업로드에 실패했습니다.", 500),
     UNKNOWN_ERROR("C500", "오류가 발생하였습니다.", 500);
 
     private final String code;
