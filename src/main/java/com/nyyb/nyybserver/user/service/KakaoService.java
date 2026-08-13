@@ -28,12 +28,14 @@ public class KakaoService {
     private final UserRepository userRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final KakaoOAuthClient kakaoOAuthClient;
+    private final RefreshTokenService refreshTokenService;
     private final List<GuestDataOwnershipTransfer> guestDataOwnershipTransfers;
 
     @Transactional
     public SocialLoginResponseDto createGuest() {
         User guest = userRepository.save(User.ofGuest());
         AuthTokens authTokens = jwtTokenProvider.generate(guest.getId(), guest.getRole().name());
+        refreshTokenService.save(guest.getId(), authTokens.getRefreshToken(), jwtTokenProvider.getRefreshTokenExpireTime());
         return new SocialLoginResponseDto(guest.getId(), guest.getNickname(), true, null, authTokens);
     }
 
@@ -55,6 +57,7 @@ public class KakaoService {
                 .orElseGet(() -> createOrConvertSocialUser(guestUser, kakaoUser));
 
         AuthTokens authTokens = jwtTokenProvider.generate(user.getId(), user.getRole().name());
+        refreshTokenService.save(user.getId(), authTokens.getRefreshToken(), jwtTokenProvider.getRefreshTokenExpireTime());
         Long linkedGuestUserId = guestUser
                 .map(User::getId)
                 .filter(id -> !id.equals(user.getId()))
