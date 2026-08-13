@@ -49,6 +49,9 @@ public class Product {
     @Column
     private RecommendStatus recommended; // LLM 추천 (KEEP/REMOVE)
 
+    @Column(columnDefinition = "TEXT")
+    private String recommendReason; // LLM 이유 문구 (카드 본문)
+
     @Enumerated(EnumType.STRING)
     @Column
     private RoutineItemStatus status; // 유저 선택 (KEPT/REMOVED)

@@ -3,6 +3,8 @@ package com.nyyb.nyybserver.analysis.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.nyyb.nyybserver.analysis.data.dto.request.AnalysisRequestDto;
+import com.nyyb.nyybserver.analysis.data.dto.response.AnalysisResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.OcrApiResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.OcrResponseDto;
 import com.nyyb.nyybserver.analysis.data.enums.ProductCategory;
@@ -55,7 +57,7 @@ public class AnalysisService {
      * @param image
      * @return OcrResponseDto
      */
-    public OcrResponseDto requestOcr(MultipartFile image) {
+    public OcrResponseDto ocr(MultipartFile image) {
         if (image == null || image.isEmpty()) {
             throw new InvalidImageException();
         }
@@ -172,5 +174,12 @@ public class AnalysisService {
                 .forEach(field -> sb.append(field.inferText())
                         .append(field.lineBreak() ? "\n" : " "));
         return sb.toString().strip();
+    }
+
+    public AnalysisResponseDto analyze(AnalysisRequestDto request) {
+
+        
+        return AnalysisResponseDto.builder()
+                .build();
     }
 }

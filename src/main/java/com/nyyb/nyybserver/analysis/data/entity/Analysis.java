@@ -37,12 +37,6 @@ public class Analysis {
     @Builder.Default
     private AnalysisStatus status = AnalysisStatus.PENDING;
 
-    @Column(columnDefinition = "TEXT")
-    private String mergedText; // 성분 정제 텍스트
-
-    @Column(columnDefinition = "TEXT")
-    private String insight; // JSON: { duplicated, cautions, summary }
-
     @CreatedDate
     @Column(updatable = false)
     private LocalDateTime createdAt;
