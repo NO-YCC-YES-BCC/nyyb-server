@@ -1,12 +1,16 @@
 package com.nyyb.nyybserver.user.controller;
 
+import com.nyyb.nyybserver.common.security.SecurityUtil;
 import com.nyyb.nyybserver.common.security.UserPrincipal;
 import com.nyyb.nyybserver.user.data.dto.request.KakaoLoginRequestDto;
+import com.nyyb.nyybserver.user.data.dto.request.KakaoNotificationRequestDto;
+import com.nyyb.nyybserver.user.data.dto.response.KakaoNotificationResponseDto;
 import com.nyyb.nyybserver.user.data.dto.response.SocialLoginResponseDto;
 import com.nyyb.nyybserver.user.service.KakaoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -52,5 +56,23 @@ public class UserController {
 
     private Long guestUserId(UserPrincipal principal) {
         return principal == null ? null : principal.id();
+    }
+
+    @PatchMapping("/notify-kakao")
+    public ResponseEntity<Void> updatekakoNotification(@RequestBody KakaoNotificationRequestDto kakaoNotificationRequestDto) {
+        Long userId = SecurityUtil.getUserId();
+
+        kakaoService.updateKakaoNotification(userId, kakaoNotificationRequestDto.enabled());
+
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/notify-kakao")
+    public ResponseEntity<KakaoNotificationResponseDto> getKakaoNotification() {
+        Long userId = SecurityUtil.getUserId();
+
+        return ResponseEntity.ok(
+                kakaoService.getKakaoNotification(userId)
+        );
     }
 }

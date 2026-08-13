@@ -107,4 +107,8 @@ public class User {
     public void mergeTo(User targetUser) {
         this.mergedToUserId = targetUser.getId();
     }
+
+    public void updateKakaoNotification(boolean enabled) {
+        this.notifyKakao = enabled;
+    }
 }
