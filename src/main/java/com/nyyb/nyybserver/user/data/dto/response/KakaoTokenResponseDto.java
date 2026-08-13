@@ -1,22 +1,14 @@
 package com.nyyb.nyybserver.user.data.dto.response;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Getter
 @NoArgsConstructor
 public class KakaoTokenResponseDto {
-    @JsonProperty("access_token")
-    private String accessToken;
-
-    @JsonProperty("token_type")
-    private String tokenType;
-
-    @JsonProperty("refresh_token")
-    private String refreshToken;
-
-    @JsonProperty("expires_in")
-    private Integer expiresIn;
+    private String access_token;
+    private String token_type;
+    private String refresh_token;
+    private Integer expires_in;
 
 }
