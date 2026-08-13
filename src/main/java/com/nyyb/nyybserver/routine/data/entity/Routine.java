@@ -31,21 +31,39 @@ public class Routine {
     @JoinColumn(name = "user_id")
     private User user;
 
-    // 분석 1개 : 루틴 0..1 (단일 플로우) — 한 분석당 루틴 최대 1개 보장
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "analysis_id", unique = true)
+    // 분석 1 : 루틴 1 (유니크 제약은 걸지 않음)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "analysis_id")
     private Analysis analysis;
+
+    @Column
+    private Integer score; // 100분위 점수 (예: 66)
+
+    @Column(columnDefinition = "TEXT")
+    private String scoreReason;
+
+    @Column
+    private String summary;
 
     @Column
     private Integer beforeCount; // 분석 전 제품 개수
 
     @Column
-    private Integer afterCount; // 유저가 유지 선택한 개수
-
-    @Column(columnDefinition = "TEXT")
-    private String expectedChange; // JSON: LLM 예상변화
+    private Integer afterCount; // 유저가 제거 선택한 개수
 
     @CreatedDate
     @Column(updatable = false)
     private LocalDateTime createdAt;
+
+    // createRoutine 단계에서 LLM 루틴 설계 결과를 반영
+    public void applyLlmRoutine(Integer score, String scoreReason, String summary) {
+        this.score = score;
+        this.scoreReason = scoreReason;
+        this.summary = summary;
+    }
+
+    // saveRoutine 단계에서 유저가 제거 선택한 개수를 반영
+    public void applyAfterCount(Integer afterCount) {
+        this.afterCount = afterCount;
+    }
 }

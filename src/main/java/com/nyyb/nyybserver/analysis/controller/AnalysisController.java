@@ -1,7 +1,7 @@
 package com.nyyb.nyybserver.analysis.controller;
 
 import com.nyyb.nyybserver.analysis.data.dto.request.AnalysisRequestDto;
-import com.nyyb.nyybserver.analysis.data.dto.response.LlmAnalysisResponseDto;
+import com.nyyb.nyybserver.analysis.data.dto.response.AnalysisResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.OcrResponseDto;
 import com.nyyb.nyybserver.analysis.service.AnalysisService;
 import com.nyyb.nyybserver.analysis.service.OcrService;
@@ -27,7 +27,7 @@ public class AnalysisController {
     }
 
     @PostMapping(value = "/{productids}")
-    public GlobalResponse<LlmAnalysisResponseDto> analyze(@RequestBody AnalysisRequestDto request) {
+    public GlobalResponse<AnalysisResponseDto> analyze(@RequestBody AnalysisRequestDto request) {
         return GlobalResponse.ok(analysisService.analyze(request));
     }
 }

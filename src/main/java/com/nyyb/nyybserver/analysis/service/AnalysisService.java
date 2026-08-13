@@ -1,6 +1,7 @@
 package com.nyyb.nyybserver.analysis.service;
 
 import com.nyyb.nyybserver.analysis.data.dto.request.AnalysisRequestDto;
+import com.nyyb.nyybserver.analysis.data.dto.response.AnalysisResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmAnalysisResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmProductAnalysisDto;
 import com.nyyb.nyybserver.analysis.data.entity.Analysis;
@@ -11,6 +12,10 @@ import com.nyyb.nyybserver.analysis.data.repository.AnalysisRepository;
 import com.nyyb.nyybserver.analysis.data.repository.ProductIngredientRepository;
 import com.nyyb.nyybserver.analysis.data.repository.ProductRepository;
 import com.nyyb.nyybserver.ingredient.data.entity.Ingredient;
+import com.nyyb.nyybserver.routine.data.entity.Routine;
+import com.nyyb.nyybserver.routine.data.entity.RoutineItem;
+import com.nyyb.nyybserver.routine.data.repository.RoutineItemRepository;
+import com.nyyb.nyybserver.routine.data.repository.RoutineRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -29,15 +34,22 @@ public class AnalysisService {
     private final AnalysisRepository analysisRepository;
     private final ProductRepository productRepository;
     private final ProductIngredientRepository productIngredientRepository;
+    private final RoutineRepository routineRepository;
+    private final RoutineItemRepository routineItemRepository;
 
     /**
-     * 제품들 -> LLM 제외/유지 분석 -> Product·Analysis 반영 -> LLM 응답 그대로 반환
-     * @param request productId 목록
-     * @return LlmAnalysisResponseDto
+     * 제품들 -> LLM 제외/유지 분석 -> Product·Analysis 반영 -> Routine·RoutineItem 생성(saveRoutine 통합) -> routineId + LLM 응답 반환
+     * @param request productId + userRoutineSlot 목록
+     * @return AnalysisResponseDto (routineId + 제품별 분석 결과)
      */
     @Transactional
-    public LlmAnalysisResponseDto analyze(AnalysisRequestDto request) {
-        String userMessage = buildUserMessage(request.getProductsIds());
+    public AnalysisResponseDto analyze(AnalysisRequestDto request) {
+        List<AnalysisRequestDto.ProductSlot> productSlots = request.getProducts();
+        List<Long> productIds = productSlots.stream()
+                .map(AnalysisRequestDto.ProductSlot::getProductId)
+                .toList();
+
+        String userMessage = buildUserMessage(productIds);
         log.info("OpenAI 요청 메시지:\n{}", userMessage);
 
         // LLM 호출 + 구조화 출력(JSON -> DTO)
@@ -52,11 +64,27 @@ public class AnalysisService {
         Analysis analysis = analysisRepository.save(Analysis.builder().build());
         llmResponse.products().forEach(result -> applyToProduct(analysis, result));
 
+        // saveRoutine 통합: 분석 1개당 Routine 1개 생성 + productId별 userRoutineSlot을 RoutineItem으로 저장
+        Routine routine = routineRepository.save(Routine.builder()
+                .analysis(analysis)
+                .beforeCount(productIds.size())
+                .build());
+
+        for (AnalysisRequestDto.ProductSlot productSlot : productSlots) {
+            Product product = productRepository.findById(productSlot.getProductId())
+                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 productId: " + productSlot.getProductId()));
+            routineItemRepository.save(RoutineItem.builder()
+                    .routine(routine)
+                    .product(product)
+                    .userRoutineSlot(productSlot.getUserRoutineSlot())
+                    .build());
+        }
+
         // REMOVE 먼저, KEEP 나중 순으로 정렬해 반환
         List<LlmProductAnalysisDto> sorted = llmResponse.products().stream()
                 .sorted(Comparator.comparingInt(p -> p.recommended() == RecommendStatus.REMOVE ? 0 : 1))
                 .toList();
-        return new LlmAnalysisResponseDto(sorted);
+        return new AnalysisResponseDto(routine.getId(), sorted);
     }
 
     // 제품별 productId + category + ocrText + 성분 -> 프롬프트 텍스트로 조립

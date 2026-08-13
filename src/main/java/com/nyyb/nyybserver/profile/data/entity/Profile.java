@@ -31,16 +31,6 @@ public class Profile {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    // ── 현재 루틴 점수 ──
-    @Column
-    private Integer score; // 100분위 점수 (예: 66)
-
-    @Column(columnDefinition = "TEXT")
-    private String scoreReason;
-
-    @Column(name = "latest_analysis_id")
-    private UUID latestAnalysisId; // 점수 산출 기준 분석
-
     // ── 마이탭 통계 ──
     @Column(nullable = false)
     @Builder.Default
