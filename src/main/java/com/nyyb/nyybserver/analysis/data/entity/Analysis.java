@@ -1,6 +1,5 @@
 package com.nyyb.nyybserver.analysis.data.entity;
 
-import com.nyyb.nyybserver.analysis.data.enums.AnalysisStatus;
 import com.nyyb.nyybserver.user.data.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -31,11 +30,6 @@ public class Analysis {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    @Builder.Default
-    private AnalysisStatus status = AnalysisStatus.PENDING;
 
     @CreatedDate
     @Column(updatable = false)

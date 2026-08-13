@@ -1,185 +1,115 @@
 package com.nyyb.nyybserver.analysis.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.nyyb.nyybserver.analysis.data.dto.request.AnalysisRequestDto;
-import com.nyyb.nyybserver.analysis.data.dto.response.AnalysisResponseDto;
-import com.nyyb.nyybserver.analysis.data.dto.response.OcrApiResponseDto;
-import com.nyyb.nyybserver.analysis.data.dto.response.OcrResponseDto;
-import com.nyyb.nyybserver.analysis.data.enums.ProductCategory;
-import com.nyyb.nyybserver.analysis.data.exception.InvalidImageException;
-import com.nyyb.nyybserver.analysis.data.exception.OcrApiException;
-import com.nyyb.nyybserver.analysis.data.exception.UnsupportedImageFormatException;
-import com.nyyb.nyybserver.file.service.FileService;
+import com.nyyb.nyybserver.analysis.data.dto.response.LlmAnalysisResponseDto;
+import com.nyyb.nyybserver.analysis.data.dto.response.LlmProductAnalysisDto;
+import com.nyyb.nyybserver.analysis.data.entity.Analysis;
+import com.nyyb.nyybserver.analysis.data.entity.Product;
+import com.nyyb.nyybserver.analysis.data.entity.ProductIngredient;
+import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
+import com.nyyb.nyybserver.analysis.data.repository.AnalysisRepository;
+import com.nyyb.nyybserver.analysis.data.repository.ProductIngredientRepository;
+import com.nyyb.nyybserver.analysis.data.repository.ProductRepository;
+import com.nyyb.nyybserver.ingredient.data.entity.Ingredient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.multipart.MultipartFile;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
-import java.time.Instant;
-import java.util.Set;
-import java.util.UUID;
+import java.util.Comparator;
+import java.util.List;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AnalysisService {
 
-    private static final Set<String> SUPPORTED_FORMATS = Set.of(
-            "jpg", "jpeg", "png", "pdf", "tiff"
-    );
-
-
-    private final RestClient clovaOcrRestClient;
-    private final ObjectMapper objectMapper;
-    private final FileService fileService;
-    private final AnalysisWriter analysisWriter;
-
-    @Value("${clova-ocr.secret-key}")
-    private String secretKey;
-
+    private final ChatClient chatClient;
+    private final AnalysisRepository analysisRepository;
+    private final ProductRepository productRepository;
+    private final ProductIngredientRepository productIngredientRepository;
 
     /**
-     * 사진 -> ocr -> 카테고리 분류, 성분 매칭
-     * @param image
-     * @return OcrResponseDto
+     * 제품들 -> LLM 제외/유지 분석 -> Product·Analysis 반영 -> LLM 응답 그대로 반환
+     * @param request productId 목록
+     * @return LlmAnalysisResponseDto
      */
-    public OcrResponseDto ocr(MultipartFile image) {
-        if (image == null || image.isEmpty()) {
-            throw new InvalidImageException();
-        }
+    @Transactional
+    public LlmAnalysisResponseDto analyze(AnalysisRequestDto request) {
+        String userMessage = buildUserMessage(request.getProductsIds());
+        log.info("OpenAI 요청 메시지:\n{}", userMessage);
 
-        // 1. 외부 I/O — CLOVA OCR 호출 (multipart/form-data: message, file)
-        MultiValueMap<String, Object> body = buildMultipartBody(image);
-        OcrApiResponseDto ocrResult;
-        try {
-            ocrResult = clovaOcrRestClient.post()
-                    .header("X-OCR-SECRET", secretKey)
-                    .contentType(MediaType.MULTIPART_FORM_DATA)
-                    .body(body)
-                    .retrieve()
-                    .body(OcrApiResponseDto.class);
-        } catch (RestClientException e) {
-            log.error("CLOVA OCR API 호출 중 오류가 발생했습니다.", e);
-            throw new OcrApiException();
-        }
+        // LLM 호출 + 구조화 출력(JSON -> DTO)
+        LlmAnalysisResponseDto llmResponse = chatClient.prompt()
+                .user(userMessage)
+                .call()
+                .entity(LlmAnalysisResponseDto.class);
 
-        // 2. 외부 I/O — S3 업로드 (key만 DB 저장, URL은 조회 시점에 발급)
-        String imageKey = fileService.upload(image, "analysis");
+        log.info("OpenAI 응답:\n{}", llmResponse);
 
-        // 3. 가공 — OCR 필드 join + 카테고리 분류
-        String ocrText = buildOcrText(ocrResult);
-        ProductCategory category = ProductCategory.classify(ocrText);
+        // Analysis 저장 후 결과를 각 Product에 반영(더티 체킹)
+        Analysis analysis = analysisRepository.save(Analysis.builder().build());
+        llmResponse.products().forEach(result -> applyToProduct(analysis, result));
 
-        // 4. DB 저장 — 트랜잭션 경계 (별도 빈)
-        AnalysisWriter.Result saved = analysisWriter.save(imageKey, category, ocrText);
-
-        // 5. 응답 조립 — 방금 저장한 값 + 즉시 사용할 presigned URL (추가 조회 없음)
-        return OcrResponseDto.builder()
-                .productId(saved.productId())
-                .imageUrl(fileService.getPresignedUrl(imageKey))
-                .category(category)
-                .ingredients(saved.ingredients())
-                .build();
+        // REMOVE 먼저, KEEP 나중 순으로 정렬해 반환
+        List<LlmProductAnalysisDto> sorted = llmResponse.products().stream()
+                .sorted(Comparator.comparingInt(p -> p.recommended() == RecommendStatus.REMOVE ? 0 : 1))
+                .toList();
+        return new LlmAnalysisResponseDto(sorted);
     }
 
-
-
-    //파일 확장자(jpg/png) -> format에
-    private String resolveFormat(MultipartFile image) {
-        String filename = image.getOriginalFilename();
-        if (!StringUtils.hasText(filename) || !filename.contains(".")) {
-            log.warn("파일 확장자를 확인할 수 없습니다. filename={}", filename);
-            throw new UnsupportedImageFormatException();
-        }
-
-        String format = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
-        if (!SUPPORTED_FORMATS.contains(format)) {
-            log.warn("지원하지 않는 이미지 형식입니다. format={}", format);
-            throw new UnsupportedImageFormatException();
-        }
-        return format;
-    }
-
-
-
-    // CLOVA OCR request
-    // message + file 를 하나로
-    private MultiValueMap<String, Object> buildMultipartBody(MultipartFile image) {
-        HttpHeaders messageHeaders = new HttpHeaders();
-        messageHeaders.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<String> messagePart = new HttpEntity<>(buildMessage(image), messageHeaders);
-
-        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        body.add("message", messagePart);
-        body.add("file", toResource(image));
-        return body;
-    }
-    // message - 메타데이터 JSON
-    private String buildMessage(MultipartFile image) {
-        ObjectNode message = objectMapper.createObjectNode();
-        message.put("version", "V2");
-        message.put("requestId", UUID.randomUUID().toString());
-        message.put("timestamp", Instant.now().toEpochMilli());
-
-        ArrayNode images = message.putArray("images");
-        ObjectNode imageNode = images.addObject();
-        imageNode.put("format", resolveFormat(image));
-        imageNode.put("name", "image");
-
-        return message.toString();
-    }
-    //MultipartFile -> file 보낼 수 있게 변환
-    private Resource toResource(MultipartFile image) {
-        try {
-            return new ByteArrayResource(image.getBytes()) {
-                @Override
-                public String getFilename() {
-                    return StringUtils.hasText(image.getOriginalFilename())
-                            ? image.getOriginalFilename()
-                            : "image";
-                }
-            };
-        } catch (IOException e) {
-            log.warn("이미지 파일을 읽을 수 없습니다.", e);
-            throw new InvalidImageException();
-        }
-    }
-
-
-
-    // OCR 결과 -> text로 전환
-    private String buildOcrText(OcrApiResponseDto result) {
-        if (result == null || result.images() == null) {
-            log.warn("OCR 응답이 비어 있습니다. result={}", result);
-            throw new OcrApiException();
-        }
-
+    // 제품별 productId + category + ocrText + 성분 -> 프롬프트 텍스트로 조립
+    private String buildUserMessage(List<Long> productIds) {
         StringBuilder sb = new StringBuilder();
-        result.images().stream()
-                .flatMap(img -> img.fields().stream())
-                .forEach(field -> sb.append(field.inferText())
-                        .append(field.lineBreak() ? "\n" : " "));
-        return sb.toString().strip();
+        sb.append("다음 제품들을 분석해 주세요.\n\n");
+
+        for (Long productId : productIds) {
+            Product product = productRepository.findById(productId)
+                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 productId: " + productId));
+
+            sb.append("=== productId: ").append(productId).append(" ===\n");
+            sb.append("category: ").append(product.getCategory().name()).append("\n");
+            sb.append("ocrText: ").append(product.getOcrText()).append("\n");
+            sb.append("ingredients: ").append(formatIngredients(productId)).append("\n\n");
+        }
+
+        return sb.toString();
     }
 
-    public AnalysisResponseDto analyze(AnalysisRequestDto request) {
+    // 해당 제품의 성분을 "성분명(위험도) - 설명" 형태로 나열
+    private String formatIngredients(Long productId) {
+        List<ProductIngredient> productIngredients =
+                productIngredientRepository.findByProductIdWithIngredient(productId);
 
-        
-        return AnalysisResponseDto.builder()
-                .build();
+        if (productIngredients.isEmpty()) {
+            return "(인식된 성분 없음)";
+        }
+
+        return productIngredients.stream()
+                .map(this::formatIngredient)
+                .reduce((a, b) -> a + "\n  - " + b)
+                .map(s -> "\n  - " + s)
+                .orElse("(인식된 성분 없음)");
+    }
+
+    private String formatIngredient(ProductIngredient pi) {
+        Ingredient ingredient = pi.getIngredient();
+        // 마스터 매칭 실패 시 ingredient == null → OCR 원문(rawName) 사용
+        if (ingredient == null) {
+            return pi.getRawName();
+        }
+        String risk = ingredient.getRiskLevel() != null ? ingredient.getRiskLevel().name() : "UNKNOWN";
+        String toxic = Boolean.TRUE.equals(ingredient.getIsToxic()) ? ", 독성" : "";
+        String description = ingredient.getDescription() != null ? " - " + ingredient.getDescription() : "";
+        return ingredient.getName() + "(" + risk + toxic + ")" + description;
+    }
+
+    // 결과 -> 같은 productId Product에 반영
+    private void applyToProduct(Analysis analysis, LlmProductAnalysisDto result) {
+        Product product = productRepository.findById(result.productId())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 productId: " + result.productId()));
+
+        product.applyAnalysis(analysis, result.productName(), result.recommended(), result.recommendReason());
     }
 }
