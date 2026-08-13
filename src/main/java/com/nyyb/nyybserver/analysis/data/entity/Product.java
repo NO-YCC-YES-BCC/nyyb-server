@@ -2,9 +2,6 @@ package com.nyyb.nyybserver.analysis.data.entity;
 
 import com.nyyb.nyybserver.analysis.data.enums.ProductCategory;
 import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
-import com.nyyb.nyybserver.analysis.data.enums.RoutineItemStatus;
-import com.nyyb.nyybserver.analysis.data.enums.RoutineSlot;
-import com.nyyb.nyybserver.routine.data.entity.Routine;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -20,7 +17,6 @@ public class Product {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // ── [1. 분석] 분석 실행 시 매핑 (스캔~분석 전, 미분석/수집 데이터는 null) ──
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "analysis_id")
     private Analysis analysis;
@@ -33,23 +29,26 @@ public class Product {
     @Builder.Default
     private ProductCategory category = ProductCategory.ETC;
 
+    @Column
+    private String productName;
+
     @Column(columnDefinition = "TEXT")
     private String ocrText; // OCR 원문
 
-    // ── [3. 제안 / 4. 설정] 루틴 단계에서 채워짐 (저장 전 null) ──
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "routine_id")
-    private Routine routine; // 담긴 루틴 (저장 전 null)
-
+    // LLM 분석 결과 (분석 완료 시 채워짐)
     @Enumerated(EnumType.STRING)
     @Column
-    private RoutineSlot slot; // 아침/저녁/전체
+    private RecommendStatus recommended; // LLM 제외/유지 제안 (KEEP/REMOVE)
 
-    @Enumerated(EnumType.STRING)
-    @Column
-    private RecommendStatus recommended; // LLM 추천 (KEEP/REMOVE)
+    @Column(columnDefinition = "TEXT")
+    private String recommendReason; // LLM 이유 문구
 
-    @Enumerated(EnumType.STRING)
-    @Column
-    private RoutineItemStatus status; // 유저 선택 (KEPT/REMOVED)
+    // LLM 분석 결과를 제품에 반영하고 Analysis에 매핑
+    public void applyAnalysis(Analysis analysis, String productName,
+                              RecommendStatus recommended, String recommendReason) {
+        this.analysis = analysis;
+        this.productName = productName;
+        this.recommended = recommended;
+        this.recommendReason = recommendReason;
+    }
 }
