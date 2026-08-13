@@ -20,4 +20,6 @@ spring:
 
 # CLOVA OCR 값(api-url, secret-key)은 프로파일별 파일에서 주입
 
+# AWS S3 값(bucket, static, access-key, secret-key)은 프로파일별 파일에서 주입
+
 # 데이터소스는 프로파일별 파일 또는 환경변수로 주입
