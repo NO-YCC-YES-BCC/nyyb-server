@@ -1,15 +1,10 @@
 package com.nyyb.nyybserver.common.security.exception;
 
-public class AuthenticationInfoException extends RuntimeException {
+import com.nyyb.nyybserver.common.response.ErrorCode;
+import com.nyyb.nyybserver.common.response.GlobalException;
+
+public class AuthenticationInfoException extends GlobalException {
     public AuthenticationInfoException() {
-        super("사용자 정보를 찾을 수 없습니다.");
-    }
-
-    public AuthenticationInfoException(String message) {
-        super(message);
-    }
-
-    public AuthenticationInfoException(String message, Throwable cause) {
-        super(message, cause);
+        super(ErrorCode.VERIFICATION_INVALID);
     }
 }

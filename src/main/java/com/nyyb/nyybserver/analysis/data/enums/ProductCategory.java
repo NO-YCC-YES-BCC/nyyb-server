@@ -84,6 +84,10 @@ public enum ProductCategory {
             Collections.emptyList()
     );
 
+
+
+
+
     private final String korName;
     private final String engName;
     private final List<String> keywords;
@@ -119,12 +123,10 @@ public enum ProductCategory {
         return ETC;
     }
 
+    // anyMatch(jdk 기본 제공) - 하나라도 만족하면 true
     private boolean matches(String normalizedText) {
         return keywords.stream()
-                .anyMatch(keyword -> normalizedText.contains(keyword.toLowerCase()));
+                .anyMatch(keyword -> normalizedText.contains(
+                        keyword.replaceAll("\\s+", "").toLowerCase()));
     }
-
-    public String getKorName() { return korName; }
-    public String getEngName() { return engName; }
-    public List<String> getKeywords() { return keywords; }
 }

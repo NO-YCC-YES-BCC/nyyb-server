@@ -19,6 +19,6 @@ public class IngredientAlias {
     @JoinColumn(name = "ingredient_id", nullable = false)
     private Ingredient ingredient;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 2000)
     private String alias; // 이명 (예: Ascorbic Acid)
 }

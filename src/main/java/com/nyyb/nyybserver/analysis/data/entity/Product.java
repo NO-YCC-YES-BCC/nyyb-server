@@ -20,13 +20,13 @@ public class Product {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // ── [1. 분석] 스캔 시 채워짐 ──
+    // ── [1. 분석] 분석 실행 시 매핑 (스캔~분석 전, 미분석/수집 데이터는 null) ──
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "analysis_id", nullable = false)
+    @JoinColumn(name = "analysis_id")
     private Analysis analysis;
 
     @Column(nullable = false)
-    private String imageUrl; // 서버가 S3에 올린 사진
+    private String imageKey; // 서버가 S3에 올린 사진 key(파일 경로)
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
