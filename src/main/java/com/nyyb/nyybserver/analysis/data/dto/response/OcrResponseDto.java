@@ -10,7 +10,6 @@ import java.util.List;
 @Builder
 public class OcrResponseDto {
     private Long productId;
-    private String imageUrl;
     private ProductCategory category;
     private List<IngredientSummaryDto> ingredients;
 }

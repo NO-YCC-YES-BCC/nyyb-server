@@ -5,7 +5,6 @@ import com.nyyb.nyybserver.analysis.data.entity.ProductIngredient;
 import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 import com.nyyb.nyybserver.analysis.data.enums.RoutineSlot;
 import com.nyyb.nyybserver.analysis.data.repository.ProductIngredientRepository;
-import com.nyyb.nyybserver.file.service.FileService;
 import com.nyyb.nyybserver.ingredient.data.entity.Ingredient;
 import com.nyyb.nyybserver.routine.data.dto.request.SaveRoutineRequestDto;
 import com.nyyb.nyybserver.routine.data.dto.response.CreateRoutineResponseDto;
@@ -41,7 +40,6 @@ public class RoutineService {
     private final RoutineItemRepository routineItemRepository;
     private final RoutineItemSelectionRepository routineItemSelectionRepository;
     private final ProductIngredientRepository productIngredientRepository;
-    private final FileService fileService;
 
     /**
      * routineId의 루틴(analyze 단계에서 생성) -> LLM 루틴 설계 -> Routine·RoutineItem 갱신 -> 오전/오후 루틴 반환
@@ -132,7 +130,6 @@ public class RoutineService {
     //   커버하지 않는 day에서는 KEEP으로 낮추며, 제외 이유는 배지와 어긋나므로 싣지 않는다.
     private RoutineDayProductDto toDayProduct(RoutineItem item, RoutineSlot daySlot) {
         Product product = item.getProduct();
-        String imageUrl = fileService.getPresignedUrl(product.getImageKey());
 
         boolean isRemove = item.getRecommended() == RecommendStatus.REMOVE;
         boolean removeInThisDay = isRemove && matchesDay(item.getLlmRoutineSlot(), daySlot);
@@ -144,7 +141,7 @@ public class RoutineService {
 
         return new RoutineDayProductDto(
                 product.getId(),
-                imageUrl,
+                product.getCategory(),
                 product.getProductName(),
                 recommended,
                 recommendReason
@@ -191,14 +188,13 @@ public class RoutineService {
         return routine.getId();
     }
 
-    // 사용자가 고른 슬롯(userRoutineSlot)이 해당 시간대(또는 BOTH)인 제품만 골라 id + imageUrl + productName로 변환
+    // 사용자가 고른 슬롯(userRoutineSlot)이 해당 시간대(또는 BOTH)인 제품만 골라 id + category + productName로 변환
     private List<RoutineProductDto> filterByUserSlot(List<RoutineItem> items, RoutineSlot slot) {
         return items.stream()
                 .filter(item -> matchesDay(item.getUserRoutineSlot(), slot))
                 .map(item -> {
                     Product product = item.getProduct();
-                    String imageUrl = fileService.getPresignedUrl(product.getImageKey());
-                    return new RoutineProductDto(product.getId(), imageUrl, product.getProductName());
+                    return new RoutineProductDto(product.getId(), product.getCategory(), product.getProductName());
                 })
                 .toList();
     }
