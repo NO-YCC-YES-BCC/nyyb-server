@@ -89,13 +89,9 @@ public class RoutineService {
         }
         routineItemRepository.saveAll(items);
 
-        // productId -> Product 조회용 맵
-        Map<Long, Product> productMap = products.stream()
-                .collect(Collectors.toMap(Product::getId, Function.identity()));
-
-        // 슬롯 기준으로 오전/오후 루틴 분리 (BOTH는 양쪽 모두 포함)
-        List<RoutineProductDto> morning = filterBySlot(llmResponse.items(), productMap, RoutineSlot.MORNING);
-        List<RoutineProductDto> evening = filterBySlot(llmResponse.items(), productMap, RoutineSlot.EVENING);
+        // 사용자가 고른 슬롯(userRoutineSlot) 기준으로 오전/오후 루틴 분리 (BOTH는 양쪽 모두 포함)
+        List<RoutineProductDto> morning = filterByUserSlot(items, RoutineSlot.MORNING);
+        List<RoutineProductDto> evening = filterByUserSlot(items, RoutineSlot.EVENING);
 
         return new CreateRoutineResponseDto(
                 routine.getId(),
@@ -195,14 +191,12 @@ public class RoutineService {
         return routine.getId();
     }
 
-    // 특정 슬롯(오전/오후)에 해당하는 제품만 골라 id + imageUrl + productName로 변환
-    private List<RoutineProductDto> filterBySlot(List<LlmRoutineItemDto> items,
-                                                 Map<Long, Product> productMap,
-                                                 RoutineSlot slot) {
+    // 사용자가 고른 슬롯(userRoutineSlot)이 해당 시간대(또는 BOTH)인 제품만 골라 id + imageUrl + productName로 변환
+    private List<RoutineProductDto> filterByUserSlot(List<RoutineItem> items, RoutineSlot slot) {
         return items.stream()
-                .filter(item -> item.slot() == slot || item.slot() == RoutineSlot.BOTH)
+                .filter(item -> matchesDay(item.getUserRoutineSlot(), slot))
                 .map(item -> {
-                    Product product = productMap.get(item.productId());
+                    Product product = item.getProduct();
                     String imageUrl = fileService.getPresignedUrl(product.getImageKey());
                     return new RoutineProductDto(product.getId(), imageUrl, product.getProductName());
                 })
@@ -217,6 +211,7 @@ public class RoutineService {
         for (Product product : products) {
             sb.append("=== productId: ").append(product.getId()).append(" ===\n");
             sb.append("productName: ").append(product.getProductName()).append("\n");
+            sb.append("category: ").append(product.getCategory().name()).append("\n");
             sb.append("recommended: ").append(product.getRecommended()).append("\n");
             sb.append("recommendReason: ").append(product.getRecommendReason()).append("\n");
             sb.append("ingredients: ").append(formatIngredients(product.getId())).append("\n\n");
