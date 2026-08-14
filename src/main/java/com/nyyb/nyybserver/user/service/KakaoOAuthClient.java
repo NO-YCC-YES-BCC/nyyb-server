@@ -28,6 +28,37 @@ public class KakaoOAuthClient {
     @Value("${kakao.redirect-uri}")
     private String redirectUri;
 
+    @Value("${kakao.admin-key}")
+    private String adminKey;
+
+    public void unlink(Long kakaoId) {
+        LinkedMultiValueMap<String, String> body =
+                new LinkedMultiValueMap<>();
+
+        body.add("target_id_type", "user_id");
+        body.add("target_id", kakaoId.toString());
+
+        try {
+            restClient.post()
+                    .uri("https://kapi.kakao.com/v1/user/unlink")
+                    .header(
+                            "Authorization",
+                            "KakaoAK " + adminKey
+                    )
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientResponseException e) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_GATEWAY,
+                    "Failed to unlink Kakao account",
+                    e
+            );
+        }
+
+    }
+
     public KakaoTokenResponseDto requestAccessToken(String code) {
         LinkedMultiValueMap<String, String> body = new LinkedMultiValueMap<>();
         body.add("grant_type", "authorization_code");

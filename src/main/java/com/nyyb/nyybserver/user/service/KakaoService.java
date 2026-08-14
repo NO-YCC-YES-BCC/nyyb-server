@@ -13,9 +13,12 @@ import com.nyyb.nyybserver.user.data.exception.OAuthProcessException;
 import com.nyyb.nyybserver.user.data.exception.UserNotFoundException;
 import com.nyyb.nyybserver.user.data.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
@@ -40,6 +43,22 @@ public class KakaoService {
     }
 
     @Transactional
+    public void withdraw(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() ->
+                        new ResponseStatusException(
+                                HttpStatus.NOT_FOUND,
+                                "user not found."
+                        )
+                );
+        if (user.getProvider() == AuthProvider.KAKAO) {
+           kakaoOAuthClient.unlink(user.getKakaoId());
+        }
+
+        refreshTokenService.delete(userId);
+        userRepository.delete(user);
+    }
+    @Transactional
     public SocialLoginResponseDto kakaoLogin(String code, Long guestUserId) {
         if (!StringUtils.hasText(code)) {
             throw new OAuthProcessException();
@@ -63,6 +82,10 @@ public class KakaoService {
                 .filter(id -> !id.equals(user.getId()))
                 .orElse(null);
         return new SocialLoginResponseDto(user.getId(), user.getNickname(), false, linkedGuestUserId, authTokens);
+    }
+
+    public void logout(Long userId) {
+        refreshTokenService.delete(userId);
     }
 
     private KakaoUserProfile getKakaoUserProfile(String code) {

@@ -53,6 +53,21 @@ public class UserController {
         return GlobalResponse.ok(kakaoService.kakaoLogin(code, guestUserId(principal)));
     }
 
+    @PostMapping("/logout")
+    public GlobalResponse<Void> logout() {
+        Long userId = SecurityUtil.getUserId();
+
+        kakaoService.logout(userId);
+        return GlobalResponse.ok();
+    }
+
+    @DeleteMapping("/user/me")
+    public GlobalResponse<Void> withdraw() {
+        Long userId = SecurityUtil.getUserId();
+        kakaoService.withdraw(userId);
+        return GlobalResponse.ok();
+    }
+
     private Long guestUserId(UserPrincipal principal) {
         return principal == null ? null : principal.id();
     }
