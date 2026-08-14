@@ -1,5 +1,6 @@
 package com.nyyb.nyybserver.user.controller;
 
+import com.nyyb.nyybserver.common.response.GlobalResponse;
 import com.nyyb.nyybserver.common.security.SecurityUtil;
 import com.nyyb.nyybserver.common.security.UserPrincipal;
 import com.nyyb.nyybserver.user.data.dto.request.KakaoLoginRequestDto;
@@ -10,9 +11,7 @@ import com.nyyb.nyybserver.user.service.KakaoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,8 +24,8 @@ public class UserController {
 
     @Operation(summary = "Create guest JWT", description = "Creates a guest user and returns JWT tokens.")
     @PostMapping("/guest")
-    public ResponseEntity<SocialLoginResponseDto> guestLogin() {
-        return ResponseEntity.ok(kakaoService.createGuest());
+    public GlobalResponse<SocialLoginResponseDto> guestLogin() {
+        return GlobalResponse.ok(kakaoService.createGuest());
     }
 
     @Operation(
@@ -34,12 +33,12 @@ public class UserController {
             description = "Logs in with Kakao. If a guest Bearer token is sent, guest-owned data is linked automatically."
     )
     @PostMapping("/kakao")
-    public ResponseEntity<SocialLoginResponseDto> kakaoLogin(
+    public GlobalResponse<SocialLoginResponseDto> kakaoLogin(
             @RequestBody KakaoLoginRequestDto request,
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal principal
     ) {
         String code = request == null ? null : request.getCode();
-        return ResponseEntity.ok(kakaoService.kakaoLogin(code, guestUserId(principal)));
+        return GlobalResponse.ok(kakaoService.kakaoLogin(code, guestUserId(principal)));
     }
 
     @Operation(
@@ -47,11 +46,26 @@ public class UserController {
             description = "Compatibility endpoint for OAuth redirect. Send a guest Bearer token to link guest-owned data."
     )
     @GetMapping("/kakao")
-    public ResponseEntity<SocialLoginResponseDto> kakaoLoginByQuery(
+    public GlobalResponse<SocialLoginResponseDto> kakaoLoginByQuery(
             @RequestParam String code,
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal principal
     ) {
-        return ResponseEntity.ok(kakaoService.kakaoLogin(code, guestUserId(principal)));
+        return GlobalResponse.ok(kakaoService.kakaoLogin(code, guestUserId(principal)));
+    }
+
+    @PostMapping("/logout")
+    public GlobalResponse<Void> logout() {
+        Long userId = SecurityUtil.getUserId();
+
+        kakaoService.logout(userId);
+        return GlobalResponse.ok();
+    }
+
+    @DeleteMapping("/user/me")
+    public GlobalResponse<Void> withdraw() {
+        Long userId = SecurityUtil.getUserId();
+        kakaoService.withdraw(userId);
+        return GlobalResponse.ok();
     }
 
     private Long guestUserId(UserPrincipal principal) {
@@ -59,19 +73,19 @@ public class UserController {
     }
 
     @PatchMapping("/notify-kakao")
-    public ResponseEntity<Void> updatekakoNotification(@RequestBody KakaoNotificationRequestDto kakaoNotificationRequestDto) {
+    public GlobalResponse<Void> updatekakoNotification(@RequestBody KakaoNotificationRequestDto kakaoNotificationRequestDto) {
         Long userId = SecurityUtil.getUserId();
 
         kakaoService.updateKakaoNotification(userId, kakaoNotificationRequestDto.enabled());
 
-        return ResponseEntity.noContent().build();
+        return GlobalResponse.ok();
     }
 
     @GetMapping("/notify-kakao")
-    public ResponseEntity<KakaoNotificationResponseDto> getKakaoNotification() {
+    public GlobalResponse<KakaoNotificationResponseDto> getKakaoNotification() {
         Long userId = SecurityUtil.getUserId();
 
-        return ResponseEntity.ok(
+        return GlobalResponse.ok(
                 kakaoService.getKakaoNotification(userId)
         );
     }

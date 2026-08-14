@@ -71,6 +71,10 @@ public class JwtTokenProvider {
                 .compact();
     }
 
+    public Duration getRefreshTokenExpireTime() {
+        return refreshTokenValidity;
+    }
+
     private Jws<Claims> parse(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(secretKey)

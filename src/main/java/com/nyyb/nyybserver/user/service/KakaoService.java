@@ -1,54 +1,61 @@
 package com.nyyb.nyybserver.user.service;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.nyyb.nyybserver.common.response.ErrorCode;
 import com.nyyb.nyybserver.common.security.AuthTokens;
 import com.nyyb.nyybserver.common.security.JwtTokenProvider;
 import com.nyyb.nyybserver.user.data.dto.response.KakaoNotificationResponseDto;
+import com.nyyb.nyybserver.user.data.dto.response.KakaoTokenResponseDto;
+import com.nyyb.nyybserver.user.data.dto.response.KakaoUserInfoResponseDto;
 import com.nyyb.nyybserver.user.data.dto.response.SocialLoginResponseDto;
 import com.nyyb.nyybserver.user.data.entity.User;
 import com.nyyb.nyybserver.user.data.enums.AuthProvider;
-import com.nyyb.nyybserver.common.response.ErrorCode;
 import com.nyyb.nyybserver.user.data.exception.OAuthProcessException;
+import com.nyyb.nyybserver.user.data.exception.UserNotFoundException;
 import com.nyyb.nyybserver.user.data.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class KakaoService {
+
     private final UserRepository userRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final KakaoOAuthClient kakaoOAuthClient;
+    private final RefreshTokenService refreshTokenService;
     private final List<GuestDataOwnershipTransfer> guestDataOwnershipTransfers;
-    private final RestClient restClient = RestClient.create();
-
-    @Value("${kakao.client-id}")
-    private String clientId;
-
-    @Value("${kakao.client-secret:}")
-    private String clientSecret;
-
-    @Value("${kakao.redirect-uri}")
-    private String redirectUri;
 
     @Transactional
     public SocialLoginResponseDto createGuest() {
         User guest = userRepository.save(User.ofGuest());
         AuthTokens authTokens = jwtTokenProvider.generate(guest.getId(), guest.getRole().name());
+        refreshTokenService.save(
+                guest.getId(),
+                authTokens.getRefreshToken(),
+                jwtTokenProvider.getRefreshTokenExpireTime()
+        );
         return new SocialLoginResponseDto(guest.getId(), guest.getNickname(), true, null, authTokens);
+    }
+
+    @Transactional
+    public void withdraw(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "user not found."));
+
+        if (user.getProvider() == AuthProvider.KAKAO) {
+            kakaoOAuthClient.unlink(user.getKakaoId());
+        }
+
+        refreshTokenService.delete(userId);
+        userRepository.delete(user);
     }
 
     @Transactional
@@ -57,25 +64,47 @@ public class KakaoService {
             throw new OAuthProcessException();
         }
 
-        KakaoTokenResponse tokenResponse = requestAccessToken(code);
-        if (tokenResponse == null || !StringUtils.hasText(tokenResponse.accessToken())) {
-            throw new OAuthProcessException(ErrorCode.KAKAO_API_FAILED);
-        }
-
-        KakaoUserResponse kakaoUser = requestUserInfo(tokenResponse.accessToken());
+        KakaoUserProfile kakaoUser = getKakaoUserProfile(code);
         Optional<User> guestUser = findActiveGuest(guestUserId);
-        Optional<User> socialUser = userRepository.findByProviderAndProviderId(AuthProvider.KAKAO, kakaoUser.providerId());
+        Optional<User> socialUser = userRepository.findByProviderAndProviderId(
+                AuthProvider.KAKAO,
+                kakaoUser.providerId()
+        );
 
         User user = socialUser
                 .map(existingUser -> linkGuestToExistingUser(guestUser, existingUser, kakaoUser.nickname()))
                 .orElseGet(() -> createOrConvertSocialUser(guestUser, kakaoUser));
 
         AuthTokens authTokens = jwtTokenProvider.generate(user.getId(), user.getRole().name());
+        refreshTokenService.save(
+                user.getId(),
+                authTokens.getRefreshToken(),
+                jwtTokenProvider.getRefreshTokenExpireTime()
+        );
         Long linkedGuestUserId = guestUser
                 .map(User::getId)
                 .filter(id -> !id.equals(user.getId()))
                 .orElse(null);
         return new SocialLoginResponseDto(user.getId(), user.getNickname(), false, linkedGuestUserId, authTokens);
+    }
+
+    public void logout(Long userId) {
+        refreshTokenService.delete(userId);
+    }
+
+    private KakaoUserProfile getKakaoUserProfile(String code) {
+        KakaoTokenResponseDto tokenResponse = kakaoOAuthClient.requestAccessToken(code);
+        if (tokenResponse == null || !StringUtils.hasText(tokenResponse.getAccessToken())) {
+            throw new OAuthProcessException(ErrorCode.KAKAO_API_FAILED);
+        }
+
+        KakaoUserInfoResponseDto userInfoResponse = kakaoOAuthClient.requestUserInfo(tokenResponse.getAccessToken());
+        if (userInfoResponse == null || userInfoResponse.getId() == null) {
+            throw new OAuthProcessException(ErrorCode.KAKAO_API_FAILED);
+        }
+
+        Long kakaoId = userInfoResponse.getId();
+        return new KakaoUserProfile(kakaoId, String.valueOf(kakaoId), userInfoResponse.getNickname());
     }
 
     private Optional<User> findActiveGuest(Long guestUserId) {
@@ -97,10 +126,15 @@ public class KakaoService {
         return existingUser;
     }
 
-    private User createOrConvertSocialUser(Optional<User> guestUser, KakaoUserResponse kakaoUser) {
+    private User createOrConvertSocialUser(Optional<User> guestUser, KakaoUserProfile kakaoUser) {
         if (guestUser.isPresent()) {
             User guest = guestUser.get();
-            guest.connectSocial(AuthProvider.KAKAO, kakaoUser.kakaoId(), kakaoUser.providerId(), kakaoUser.nickname());
+            guest.connectSocial(
+                    AuthProvider.KAKAO,
+                    kakaoUser.kakaoId(),
+                    kakaoUser.providerId(),
+                    kakaoUser.nickname()
+            );
             return guest;
         }
 
@@ -112,106 +146,25 @@ public class KakaoService {
         ));
     }
 
-    private KakaoTokenResponse requestAccessToken(String code) {
-        LinkedMultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-        body.add("grant_type", "authorization_code");
-        body.add("client_id", clientId);
-        body.add("redirect_uri", redirectUri);
-        body.add("code", code);
-        if (StringUtils.hasText(clientSecret)) {
-            body.add("client_secret", clientSecret);
-        }
-
-        try {
-            return restClient.post()
-                    .uri("https://kauth.kakao.com/oauth/token")
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                    .body(body)
-                    .retrieve()
-                    .body(KakaoTokenResponse.class);
-        } catch (RestClientResponseException e) {
-            log.warn("Kakao authorization code is invalid or expired.", e);
-            throw new OAuthProcessException();
-        }
-    }
-
-    private KakaoUserResponse requestUserInfo(String accessToken) {
-        KakaoUserInfoResponse response;
-        try {
-            response = restClient.get()
-                    .uri("https://kapi.kakao.com/v2/user/me")
-                    .header("Authorization", "Bearer " + accessToken)
-                    .retrieve()
-                    .body(KakaoUserInfoResponse.class);
-        } catch (RestClientResponseException e) {
-            log.error("Failed to request Kakao user info.", e);
-            throw new OAuthProcessException(ErrorCode.KAKAO_API_FAILED);
-        }
-
-        if (response == null || response.id() == null) {
-            throw new OAuthProcessException(ErrorCode.KAKAO_API_FAILED);
-        }
-
-        String nickname = extractNickname(response);
-        return new KakaoUserResponse(response.id(), String.valueOf(response.id()), nickname);
-    }
-
-    private String extractNickname(KakaoUserInfoResponse response) {
-        Map<String, Object> properties = response.properties();
-        Map<String, Object> kakaoAccount = response.kakaoAccount();
-        Map<String, Object> profile = nestedMap(kakaoAccount, "profile");
-
-        String nickname = stringValue(profile, "nickname");
-        if (!StringUtils.hasText(nickname)) {
-            nickname = stringValue(properties, "nickname");
-        }
-        return StringUtils.hasText(nickname) ? nickname : "Kakao User";
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> nestedMap(Map<String, Object> source, String key) {
-        Object value = source == null ? null : source.get(key);
-        return value instanceof Map<?, ?> ? (Map<String, Object>) value : Map.of();
-    }
-
-    private String stringValue(Map<String, Object> source, String key) {
-        Object value = source == null ? null : source.get(key);
-        return value == null ? null : String.valueOf(value);
-    }
-
-    private record KakaoTokenResponse(
-            @JsonProperty("access_token") String accessToken
-    ) {
-    }
-    private record KakaoUserInfoResponse(
-            Long id,
-            Map<String, Object> properties,
-            @JsonProperty("kakao_account") Map<String, Object> kakaoAccount
-    ) {
-    }
-
-    private record KakaoUserResponse(
-            Long kakaoId,
-            String providerId,
-            String nickname
-    ) {
-    }
-
     @Transactional
     public void updateKakaoNotification(Long userId, boolean enabled) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() ->
-                        new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(UserNotFoundException::new);
 
         user.updateKakaoNotification(enabled);
     }
 
-    @Transactional(readOnly = true)
     public KakaoNotificationResponseDto getKakaoNotification(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() ->
-                        new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(UserNotFoundException::new);
 
         return new KakaoNotificationResponseDto(user.getNotifyKakao());
+    }
+
+    private record KakaoUserProfile(
+            Long kakaoId,
+            String providerId,
+            String nickname
+    ) {
     }
 }
