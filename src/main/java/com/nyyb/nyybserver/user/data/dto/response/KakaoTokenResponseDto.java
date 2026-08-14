@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor
 public class KakaoTokenResponseDto {
+
     @JsonProperty("access_token")
     private String accessToken;
 
@@ -18,5 +19,4 @@ public class KakaoTokenResponseDto {
 
     @JsonProperty("expires_in")
     private Integer expiresIn;
-
 }

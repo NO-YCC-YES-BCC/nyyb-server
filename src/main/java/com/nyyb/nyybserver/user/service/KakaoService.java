@@ -14,7 +14,6 @@ import com.nyyb.nyybserver.user.data.exception.UserNotFoundException;
 import com.nyyb.nyybserver.user.data.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -38,26 +37,27 @@ public class KakaoService {
     public SocialLoginResponseDto createGuest() {
         User guest = userRepository.save(User.ofGuest());
         AuthTokens authTokens = jwtTokenProvider.generate(guest.getId(), guest.getRole().name());
-        refreshTokenService.save(guest.getId(), authTokens.getRefreshToken(), jwtTokenProvider.getRefreshTokenExpireTime());
+        refreshTokenService.save(
+                guest.getId(),
+                authTokens.getRefreshToken(),
+                jwtTokenProvider.getRefreshTokenExpireTime()
+        );
         return new SocialLoginResponseDto(guest.getId(), guest.getNickname(), true, null, authTokens);
     }
 
     @Transactional
     public void withdraw(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() ->
-                        new ResponseStatusException(
-                                HttpStatus.NOT_FOUND,
-                                "user not found."
-                        )
-                );
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "user not found."));
+
         if (user.getProvider() == AuthProvider.KAKAO) {
-           kakaoOAuthClient.unlink(user.getKakaoId());
+            kakaoOAuthClient.unlink(user.getKakaoId());
         }
 
         refreshTokenService.delete(userId);
         userRepository.delete(user);
     }
+
     @Transactional
     public SocialLoginResponseDto kakaoLogin(String code, Long guestUserId) {
         if (!StringUtils.hasText(code)) {
@@ -76,7 +76,11 @@ public class KakaoService {
                 .orElseGet(() -> createOrConvertSocialUser(guestUser, kakaoUser));
 
         AuthTokens authTokens = jwtTokenProvider.generate(user.getId(), user.getRole().name());
-        refreshTokenService.save(user.getId(), authTokens.getRefreshToken(), jwtTokenProvider.getRefreshTokenExpireTime());
+        refreshTokenService.save(
+                user.getId(),
+                authTokens.getRefreshToken(),
+                jwtTokenProvider.getRefreshTokenExpireTime()
+        );
         Long linkedGuestUserId = guestUser
                 .map(User::getId)
                 .filter(id -> !id.equals(user.getId()))
@@ -125,7 +129,12 @@ public class KakaoService {
     private User createOrConvertSocialUser(Optional<User> guestUser, KakaoUserProfile kakaoUser) {
         if (guestUser.isPresent()) {
             User guest = guestUser.get();
-            guest.connectSocial(AuthProvider.KAKAO, kakaoUser.kakaoId(), kakaoUser.providerId(), kakaoUser.nickname());
+            guest.connectSocial(
+                    AuthProvider.KAKAO,
+                    kakaoUser.kakaoId(),
+                    kakaoUser.providerId(),
+                    kakaoUser.nickname()
+            );
             return guest;
         }
 
@@ -145,7 +154,6 @@ public class KakaoService {
         user.updateKakaoNotification(enabled);
     }
 
-    @Transactional(readOnly = true)
     public KakaoNotificationResponseDto getKakaoNotification(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(UserNotFoundException::new);
