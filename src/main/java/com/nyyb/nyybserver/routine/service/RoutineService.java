@@ -110,7 +110,7 @@ public class RoutineService {
     /**
      * routineId + 시간대(morning/evening) -> 해당 시간대 제품 목록 반환
      * - day 소속: userRoutineSlot 이 요청 시간대(또는 BOTH=전체는 양쪽 모두 포함)
-     * - 각 제품: id + imageUrl + productName + recommended + recommendReason (recommended는 시간대 관계없이 항상 포함)
+     * - 각 제품 recommended: LLM 추천 슬롯(llmRoutineSlot)이 이 시간대를 커버하고 REMOVE일 때만 REMOVE, 그 외엔 KEEP
      * @param routineId 루틴 식별자
      * @param slot      MORNING(아침) 또는 EVENING(저녁)
      */
@@ -123,25 +123,35 @@ public class RoutineService {
 
         List<RoutineDayProductDto> products = items.stream()
                 .filter(item -> matchesDay(item.getUserRoutineSlot(), slot))
-                .map(this::toDayProduct)
+                .map(item -> toDayProduct(item, slot))
                 .toList();
 
         return new RoutineDayResponseDto(slot, products);
     }
 
-    // userRoutineSlot 기준 해당 시간대 제품을 DTO로.
-    // 슬롯은 응답 최상단 slot에만 있고, 제품에는 KEEP/REMOVE만 담는다(REMOVE 추천이 아니면 KEEP).
-    private RoutineDayProductDto toDayProduct(RoutineItem item) {
+    // 요청 슬롯(daySlot) 기준으로 제품을 DTO로 가공.
+    // 슬롯은 응답 최상단 slot에만 있고, 제품에는 KEEP/REMOVE만 담는다.
+    // - 유지(KEEP) 제품: 이 제품이 뜨는 day라면 항상 KEEP + 유지 이유를 그대로 노출한다.
+    // - 제외(REMOVE) 제품: LLM 추천 슬롯이 이 day를 커버(daySlot 또는 BOTH)할 때만 REMOVE + 제외 이유를 노출하고,
+    //   커버하지 않는 day에서는 KEEP으로 낮추며, 제외 이유는 배지와 어긋나므로 싣지 않는다.
+    private RoutineDayProductDto toDayProduct(RoutineItem item, RoutineSlot daySlot) {
         Product product = item.getProduct();
         String imageUrl = fileService.getPresignedUrl(product.getImageKey());
-        RecommendStatus recommended =
-                item.getRecommended() == RecommendStatus.REMOVE ? RecommendStatus.REMOVE : RecommendStatus.KEEP;
+
+        boolean isRemove = item.getRecommended() == RecommendStatus.REMOVE;
+        boolean removeInThisDay = isRemove && matchesDay(item.getLlmRoutineSlot(), daySlot);
+
+        RecommendStatus recommended = removeInThisDay ? RecommendStatus.REMOVE : RecommendStatus.KEEP;
+        String recommendReason = isRemove
+                ? (removeInThisDay ? item.getRecommendReason() : null) // 제외 제품: 제외가 적용되는 day에서만 이유 노출
+                : item.getRecommendReason();                           // 유지 제품: 항상 유지 이유 노출
+
         return new RoutineDayProductDto(
                 product.getId(),
                 imageUrl,
                 product.getProductName(),
                 recommended,
-                item.getRecommendReason()
+                recommendReason
         );
     }
 
