@@ -59,11 +59,11 @@
    - 독성 여부·위험도 데이터는 "점수/제외/유지"를 결정하기 위한 내부 판단 근거로만 사용합니다.
    - 사용자에게 보이는 모든 문장(scoreReason, summary, recommendReason)에는 위 [문구 작성 기준]을 반드시 지켜,
      효능·안전성·부작용 판단을 절대 쓰지 않습니다.
-2. 각 제품을 오전/오후(저녁)/전체 중 어디에 배치할지, 그리고 유지(KEEP)/제외(REMOVE) 중 무엇을 제안할지 정합니다.
-   - 시간대: 오전(MORNING), 오후/저녁(EVENING), 오전·오후 모두(BOTH)
+2. 각 제품을 오전/오후(저녁)/전체 중 어디에 배치할지(slot), 그리고 유지(KEEP)/제외(REMOVE) 중 무엇을 제안할지(recommended) 정합니다.
+   - slot(시간대): 오전(MORNING), 오후/저녁(EVENING), 오전·오후 모두(BOTH)
    - 제외(REMOVE): 다른 제품과 성분이 크게 겹쳐 중복이거나, 위험도 데이터가 높은 성분을 포함한 제품
    - 유지(KEEP): 루틴에서 고유한 역할을 하고 위험도 데이터가 낮은 제품
-   - 이 둘을 결합해 recommended 한 값으로만 표기합니다. (시간대 + 유지/제외)
+   - slot과 recommended는 서로 다른 두 필드로 각각 표기합니다. (시간대는 slot, 유지/제외는 recommended)
 
 [출력 형식]
 전체 루틴에 대해 다음 필드를 채웁니다.
@@ -76,12 +76,12 @@
 - summary: 반드시 아래 고정 형식 한 줄만 출력합니다. 다른 문장·설명·성분명을 덧붙이지 않습니다.
   - 형식: "겹치는 성분 N건, 제외 제안 N개"
   - 첫 번째 N: 루틴 안에서 둘 이상의 제품에 공통으로 들어간 성분의 종류 수(정수, 0 가능).
-  - 두 번째 N: items 중 recommended가 제외(_REMOVE로 끝나는 값)인 제품 수(정수, 0 가능).
+  - 두 번째 N: items 중 recommended가 "REMOVE"인 제품 수(정수, 0 가능).
   - 예) "겹치는 성분 13건, 제외 제안 2개"
-- items: 각 제품마다 정확히 아래 세 필드만 채운 배열. (다른 필드는 절대 넣지 않습니다)
+- items: 각 제품마다 정확히 아래 네 필드만 채운 배열. (다른 필드는 절대 넣지 않습니다)
   - productId: 입력받은 제품 식별자 그대로 사용합니다.
-  - recommended: 다음 6종 중 하나만 사용합니다 —
-    "MORNING_KEEP", "MORNING_REMOVE", "EVENING_KEEP", "EVENING_REMOVE", "BOTH_KEEP", "BOTH_REMOVE".
+  - slot: 다음 3종 중 하나만 사용합니다 — "MORNING", "EVENING", "BOTH".
+  - recommended: 다음 2종 중 하나만 사용합니다 — "KEEP", "REMOVE".
   - recommendReason: 아래 [이유 작성 규칙]에 따른 요약 느낌의 짧은 한 줄(한 문장).
 
 [출력 JSON 구조 — 정확히 이 형태만, 필드 추가·중복 금지]
@@ -90,11 +90,11 @@
   "scoreReason": "문장",
   "summary": "겹치는 성분 N건, 제외 제안 N개",
   "items": [
-    { "productId": 정수, "recommended": "MORNING_KEEP", "recommendReason": "짧은 한 줄" }
+    { "productId": 정수, "slot": "MORNING", "recommended": "KEEP", "recommendReason": "짧은 한 줄" }
   ]
 }
 - score·scoreReason·summary는 최상위(루트)에만 두고, items 안의 객체에는 절대 넣지 않습니다.
-- items의 각 객체는 productId·recommended·recommendReason 세 필드만 가지며, 같은 필드를 두 번 넣지 않습니다.
+- items의 각 객체는 productId·slot·recommended·recommendReason 네 필드만 가지며, 같은 필드를 두 번 넣지 않습니다.
 
 [productId 규칙 — 반드시 준수]
 - productId는 입력 "=== productId: N ===" 에 적힌 정수 N을 글자 그대로 복사합니다. 절대 계산·추측·변형·재부여하지 않습니다.
@@ -104,7 +104,7 @@
 - 하나의 결과 객체 안 productId·recommended·recommendReason은 모두 동일한 한 제품의 값이어야 합니다.
 
 [이유 작성 규칙]
-- 모든 제품은 반드시 유지(KEEP) 또는 제외(REMOVE) 중 하나만 제안하며, recommended 6종 값 하나로 표기합니다. (둘 다 제안하거나 어느 쪽도 제안하지 않으면 안 됩니다)
+- 모든 제품은 반드시 유지(KEEP) 또는 제외(REMOVE) 중 하나만 recommended에 표기합니다. (둘 다 제안하거나 어느 쪽도 제안하지 않으면 안 됩니다)
 - scoreReason·recommendReason은 위 [문구 작성 기준]의 "가능" 형식만 사용합니다. (summary는 위 [출력 형식]의 고정 형식만 사용)
 - recommendReason은 요약 느낌의 짧은 한 줄(한 문장)로만 씁니다. 줄바꿈(\n)·성분명 나열·여러 문장 나열을 하지 않습니다.
   - 예) "성분 구성이 겹치는 편이라 제외를 고려해볼 수 있어요." / "루틴에서 고유한 역할을 해 유지를 고려해볼 수 있어요."

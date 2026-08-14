@@ -2,7 +2,7 @@ package com.nyyb.nyybserver.routine.service;
 
 import com.nyyb.nyybserver.analysis.data.entity.Product;
 import com.nyyb.nyybserver.analysis.data.entity.ProductIngredient;
-import com.nyyb.nyybserver.analysis.data.enums.RoutineRecommendStatus;
+import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 import com.nyyb.nyybserver.analysis.data.enums.RoutineSlot;
 import com.nyyb.nyybserver.analysis.data.repository.ProductIngredientRepository;
 import com.nyyb.nyybserver.file.service.FileService;
@@ -17,6 +17,7 @@ import com.nyyb.nyybserver.routine.data.dto.response.RoutineProductDto;
 import com.nyyb.nyybserver.routine.data.entity.Routine;
 import com.nyyb.nyybserver.routine.data.entity.RoutineItem;
 import com.nyyb.nyybserver.routine.data.repository.RoutineItemRepository;
+import com.nyyb.nyybserver.routine.data.repository.RoutineItemSelectionRepository;
 import com.nyyb.nyybserver.routine.data.repository.RoutineRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +39,7 @@ public class RoutineService {
     private final ChatClient routineChatClient;
     private final RoutineRepository routineRepository;
     private final RoutineItemRepository routineItemRepository;
+    private final RoutineItemSelectionRepository routineItemSelectionRepository;
     private final ProductIngredientRepository productIngredientRepository;
     private final FileService fileService;
 
@@ -82,8 +84,8 @@ public class RoutineService {
             if (item == null) {
                 throw new IllegalArgumentException("루틴에 없는 productId: " + dto.productId());
             }
-            // llmRoutineSlot은 recommended(6종)에서 도출해 저장
-            item.applyLlmRoutine(dto.recommended().slot(), dto.recommended(), dto.recommendReason());
+            // LLM이 내려준 슬롯/추천(KEEP·REMOVE)/이유를 저장
+            item.applyLlmRoutine(dto.slot(), dto.recommended(), dto.recommendReason());
         }
         routineItemRepository.saveAll(items);
 
@@ -127,15 +129,18 @@ public class RoutineService {
         return new RoutineDayResponseDto(slot, products);
     }
 
-    // userRoutineSlot 기준 해당 시간대 제품을 DTO로. recommended·recommendReason은 시간대 관계없이 항상 포함.
+    // userRoutineSlot 기준 해당 시간대 제품을 DTO로.
+    // 슬롯은 응답 최상단 slot에만 있고, 제품에는 KEEP/REMOVE만 담는다(REMOVE 추천이 아니면 KEEP).
     private RoutineDayProductDto toDayProduct(RoutineItem item) {
         Product product = item.getProduct();
         String imageUrl = fileService.getPresignedUrl(product.getImageKey());
+        RecommendStatus recommended =
+                item.getRecommended() == RecommendStatus.REMOVE ? RecommendStatus.REMOVE : RecommendStatus.KEEP;
         return new RoutineDayProductDto(
                 product.getId(),
                 imageUrl,
                 product.getProductName(),
-                item.getRecommended(),
+                recommended,
                 item.getRecommendReason()
         );
     }
@@ -146,9 +151,12 @@ public class RoutineService {
     }
 
     /**
-     * routineId + 제품별 유저 선택(KEPT/REMOVED) -> RoutineItem.status 저장 + REMOVED 개수를 Routine.afterCount에 저장
+     * routineId + 제품별 유저 선택(slot + KEEP/REMOVE) -> (routineId, productId, slot) 단위로 슬롯 선택 upsert
+     * + REMOVE인 슬롯 레코드 수를 Routine.afterCount에 저장.
+     * 오전/저녁 화면이 독립적으로 저장돼도 각자 자기 슬롯 레코드만 갱신하므로 병합 로직이 필요 없다.
+     * BOTH 제품은 슬롯 레코드가 2개(오전·저녁)라 양쪽 제거 시 자동으로 2, 한쪽만 제거하면 1이 된다.
      * @param routineId 루틴 식별자
-     * @param request   product id + status 목록
+     * @param request   product id + slot + action 목록
      * @return routineId
      */
     @Transactional
@@ -160,21 +168,18 @@ public class RoutineService {
         Map<Long, RoutineItem> itemMap = items.stream()
                 .collect(Collectors.toMap(item -> item.getProduct().getId(), Function.identity()));
 
-        for (SaveRoutineRequestDto.ProductStatus ps : request.getProducts()) {
+        for (SaveRoutineRequestDto.ProductSelection ps : request.getProducts()) {
             RoutineItem item = itemMap.get(ps.getId());
             if (item == null) {
                 throw new IllegalArgumentException("루틴에 없는 productId: " + ps.getId());
             }
-            item.applyUserStatus(ps.getStatus());
+            item.applyUserSelection(ps.getSlot(), ps.getAction());
         }
         routineItemRepository.saveAll(items);
 
-        // 제거 개수 -> afterCount (오전/오후 제거=1, 전체 제거=2)
-        int afterCount = items.stream()
-                .filter(item -> item.getStatus() != null)
-                .mapToInt(item -> item.getStatus().removedCount())
-                .sum();
-        routine.applyAfterCount(afterCount);
+        // 제거(REMOVE)로 선택된 슬롯 레코드 수 -> afterCount (BOTH 양쪽 제거 시 자동 2)
+        long afterCount = routineItemSelectionRepository.countByRoutineIdAndAction(routineId, RecommendStatus.REMOVE);
+        routine.applyAfterCount((int) afterCount);
         routineRepository.save(routine);
 
         return routine.getId();
@@ -185,7 +190,7 @@ public class RoutineService {
                                                  Map<Long, Product> productMap,
                                                  RoutineSlot slot) {
         return items.stream()
-                .filter(item -> item.recommended().slot() == slot || item.recommended().slot() == RoutineSlot.BOTH)
+                .filter(item -> item.slot() == slot || item.slot() == RoutineSlot.BOTH)
                 .map(item -> {
                     Product product = productMap.get(item.productId());
                     String imageUrl = fileService.getPresignedUrl(product.getImageKey());

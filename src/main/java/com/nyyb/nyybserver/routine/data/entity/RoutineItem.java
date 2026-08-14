@@ -1,8 +1,7 @@
 package com.nyyb.nyybserver.routine.data.entity;
 
 import com.nyyb.nyybserver.analysis.data.entity.Product;
-import com.nyyb.nyybserver.analysis.data.enums.RoutineItemStatus;
-import com.nyyb.nyybserver.analysis.data.enums.RoutineRecommendStatus;
+import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 import com.nyyb.nyybserver.analysis.data.enums.RoutineSlot;
 import jakarta.persistence.*;
 import lombok.*;
@@ -10,6 +9,8 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Builder
@@ -44,28 +45,43 @@ public class RoutineItem {
 
     @Enumerated(EnumType.STRING)
     @Column
-    private RoutineRecommendStatus recommended; // LLM 추천 (시간대+유지/제외 6종)
+    private RecommendStatus recommended; // LLM 추천 (KEEP/REMOVE) — 슬롯은 llmRoutineSlot에 별도 저장
 
     @Column(columnDefinition = "TEXT")
     private String recommendReason; // LLM 이유 문구 (카드 본문)
 
-    @Enumerated(EnumType.STRING)
-    @Column
-    private RoutineItemStatus status; // 유저 선택 (KEPT/REMOVED)
+    // 유저의 슬롯별 선택 (KEEP/REMOVE). BOTH 제품은 최대 2개(MORNING/EVENING).
+    @Builder.Default
+    @OneToMany(mappedBy = "routineItem", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RoutineItemSelection> selections = new ArrayList<>();
 
     @CreatedDate
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
     // createRoutine 단계에서 LLM 루틴 설계 결과(슬롯/추천/이유)를 반영
-    public void applyLlmRoutine(RoutineSlot llmRoutineSlot, RoutineRecommendStatus recommended, String recommendReason) {
+    public void applyLlmRoutine(RoutineSlot llmRoutineSlot, RecommendStatus recommended, String recommendReason) {
         this.llmRoutineSlot = llmRoutineSlot;
         this.recommended = recommended;
         this.recommendReason = recommendReason;
     }
 
-    // saveRoutine 단계에서 유저 선택(KEPT/REMOVED)을 반영
-    public void applyUserStatus(RoutineItemStatus status) {
-        this.status = status;
+    /**
+     * saveRoutine 단계에서 유저의 슬롯별 선택(KEEP/REMOVE)을 upsert.
+     * 같은 slot 레코드가 있으면 action만 갱신, 없으면 새로 추가한다.
+     * 오전/저녁 화면이 독립적으로 저장돼도 서로 다른 slot 레코드라 병합 로직이 필요 없다.
+     */
+    public void applyUserSelection(RoutineSlot slot, RecommendStatus action) {
+        for (RoutineItemSelection selection : selections) {
+            if (selection.getSlot() == slot) {
+                selection.changeAction(action);
+                return;
+            }
+        }
+        selections.add(RoutineItemSelection.builder()
+                .routineItem(this)
+                .slot(slot)
+                .action(action)
+                .build());
     }
 }
