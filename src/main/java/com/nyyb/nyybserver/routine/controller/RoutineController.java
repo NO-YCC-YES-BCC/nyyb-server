@@ -30,7 +30,7 @@ public class RoutineController {
         return GlobalResponse.ok(routineService.getRoutineDay(routineId, parseSlot(slot)));
     }
 
-    @PostMapping("/{routineId}/products")
+    @PatchMapping("/{routineId}/products")
     public GlobalResponse<UUID> saveRoutine(@PathVariable UUID routineId,
                                             @RequestBody SaveRoutineRequestDto request) {
         return GlobalResponse.ok(routineService.saveRoutine(routineId, request));
