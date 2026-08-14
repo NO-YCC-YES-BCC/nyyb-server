@@ -26,7 +26,7 @@ public class AnalysisController {
         return GlobalResponse.ok(ocrService.ocr(file));
     }
 
-    @PostMapping(value = "/{productids}")
+    @PostMapping
     public GlobalResponse<AnalysisResponseDto> analyze(@RequestBody AnalysisRequestDto request) {
         return GlobalResponse.ok(analysisService.analyze(request));
     }

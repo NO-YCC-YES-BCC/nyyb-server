@@ -1,15 +1,13 @@
 package com.nyyb.nyybserver.routine.data.dto.response;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.nyyb.nyybserver.analysis.data.enums.RoutineRecommendStatus;
+import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 
-// recommended가 해당 시간대에 해당할 때만 recommended·recommendReason 포함(그 외엔 생략)
-@JsonInclude(JsonInclude.Include.NON_NULL)
+// 슬롯 정보는 응답 최상단 slot에만 있고, 제품 안에는 KEEP/REMOVE만 담는다.
 public record RoutineDayProductDto(
-        Long id,                             // productId
-        String imageUrl,                     // imageKey로 발급
+        Long id,                        // productId
+        String imageUrl,                // imageKey로 발급
         String productName,
-        RoutineRecommendStatus recommended,  // 이 시간대에 해당할 때만, 아니면 생략
-        String recommendReason               // 이 시간대에 해당할 때만, 아니면 생략
+        RecommendStatus recommended,    // 이 슬롯 기준 KEEP / REMOVE
+        String recommendReason          // LLM 이유 문구
 ) {
 }

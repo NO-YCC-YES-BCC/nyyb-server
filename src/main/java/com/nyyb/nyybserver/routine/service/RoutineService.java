@@ -2,7 +2,7 @@ package com.nyyb.nyybserver.routine.service;
 
 import com.nyyb.nyybserver.analysis.data.entity.Product;
 import com.nyyb.nyybserver.analysis.data.entity.ProductIngredient;
-import com.nyyb.nyybserver.analysis.data.enums.RoutineRecommendStatus;
+import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 import com.nyyb.nyybserver.analysis.data.enums.RoutineSlot;
 import com.nyyb.nyybserver.analysis.data.repository.ProductIngredientRepository;
 import com.nyyb.nyybserver.file.service.FileService;
@@ -17,6 +17,7 @@ import com.nyyb.nyybserver.routine.data.dto.response.RoutineProductDto;
 import com.nyyb.nyybserver.routine.data.entity.Routine;
 import com.nyyb.nyybserver.routine.data.entity.RoutineItem;
 import com.nyyb.nyybserver.routine.data.repository.RoutineItemRepository;
+import com.nyyb.nyybserver.routine.data.repository.RoutineItemSelectionRepository;
 import com.nyyb.nyybserver.routine.data.repository.RoutineRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +39,7 @@ public class RoutineService {
     private final ChatClient routineChatClient;
     private final RoutineRepository routineRepository;
     private final RoutineItemRepository routineItemRepository;
+    private final RoutineItemSelectionRepository routineItemSelectionRepository;
     private final ProductIngredientRepository productIngredientRepository;
     private final FileService fileService;
 
@@ -82,18 +84,14 @@ public class RoutineService {
             if (item == null) {
                 throw new IllegalArgumentException("루틴에 없는 productId: " + dto.productId());
             }
-            // llmRoutineSlot은 recommended(6종)에서 도출해 저장
-            item.applyLlmRoutine(dto.recommended().slot(), dto.recommended(), dto.recommendReason());
+            // LLM이 내려준 슬롯/추천(KEEP·REMOVE)/이유를 저장
+            item.applyLlmRoutine(dto.slot(), dto.recommended(), dto.recommendReason());
         }
         routineItemRepository.saveAll(items);
 
-        // productId -> Product 조회용 맵
-        Map<Long, Product> productMap = products.stream()
-                .collect(Collectors.toMap(Product::getId, Function.identity()));
-
-        // 슬롯 기준으로 오전/오후 루틴 분리 (BOTH는 양쪽 모두 포함)
-        List<RoutineProductDto> morning = filterBySlot(llmResponse.items(), productMap, RoutineSlot.MORNING);
-        List<RoutineProductDto> evening = filterBySlot(llmResponse.items(), productMap, RoutineSlot.EVENING);
+        // 사용자가 고른 슬롯(userRoutineSlot) 기준으로 오전/오후 루틴 분리 (BOTH는 양쪽 모두 포함)
+        List<RoutineProductDto> morning = filterByUserSlot(items, RoutineSlot.MORNING);
+        List<RoutineProductDto> evening = filterByUserSlot(items, RoutineSlot.EVENING);
 
         return new CreateRoutineResponseDto(
                 routine.getId(),
@@ -108,7 +106,7 @@ public class RoutineService {
     /**
      * routineId + 시간대(morning/evening) -> 해당 시간대 제품 목록 반환
      * - day 소속: userRoutineSlot 이 요청 시간대(또는 BOTH=전체는 양쪽 모두 포함)
-     * - 각 제품: id + imageUrl + productName + recommended + recommendReason (recommended는 시간대 관계없이 항상 포함)
+     * - 각 제품 recommended: LLM 추천 슬롯(llmRoutineSlot)이 이 시간대를 커버하고 REMOVE일 때만 REMOVE, 그 외엔 KEEP
      * @param routineId 루틴 식별자
      * @param slot      MORNING(아침) 또는 EVENING(저녁)
      */
@@ -121,22 +119,35 @@ public class RoutineService {
 
         List<RoutineDayProductDto> products = items.stream()
                 .filter(item -> matchesDay(item.getUserRoutineSlot(), slot))
-                .map(this::toDayProduct)
+                .map(item -> toDayProduct(item, slot))
                 .toList();
 
         return new RoutineDayResponseDto(slot, products);
     }
 
-    // userRoutineSlot 기준 해당 시간대 제품을 DTO로. recommended·recommendReason은 시간대 관계없이 항상 포함.
-    private RoutineDayProductDto toDayProduct(RoutineItem item) {
+    // 요청 슬롯(daySlot) 기준으로 제품을 DTO로 가공.
+    // 슬롯은 응답 최상단 slot에만 있고, 제품에는 KEEP/REMOVE만 담는다.
+    // - 유지(KEEP) 제품: 이 제품이 뜨는 day라면 항상 KEEP + 유지 이유를 그대로 노출한다.
+    // - 제외(REMOVE) 제품: LLM 추천 슬롯이 이 day를 커버(daySlot 또는 BOTH)할 때만 REMOVE + 제외 이유를 노출하고,
+    //   커버하지 않는 day에서는 KEEP으로 낮추며, 제외 이유는 배지와 어긋나므로 싣지 않는다.
+    private RoutineDayProductDto toDayProduct(RoutineItem item, RoutineSlot daySlot) {
         Product product = item.getProduct();
         String imageUrl = fileService.getPresignedUrl(product.getImageKey());
+
+        boolean isRemove = item.getRecommended() == RecommendStatus.REMOVE;
+        boolean removeInThisDay = isRemove && matchesDay(item.getLlmRoutineSlot(), daySlot);
+
+        RecommendStatus recommended = removeInThisDay ? RecommendStatus.REMOVE : RecommendStatus.KEEP;
+        String recommendReason = isRemove
+                ? (removeInThisDay ? item.getRecommendReason() : null) // 제외 제품: 제외가 적용되는 day에서만 이유 노출
+                : item.getRecommendReason();                           // 유지 제품: 항상 유지 이유 노출
+
         return new RoutineDayProductDto(
                 product.getId(),
                 imageUrl,
                 product.getProductName(),
-                item.getRecommended(),
-                item.getRecommendReason()
+                recommended,
+                recommendReason
         );
     }
 
@@ -146,9 +157,12 @@ public class RoutineService {
     }
 
     /**
-     * routineId + 제품별 유저 선택(KEPT/REMOVED) -> RoutineItem.status 저장 + REMOVED 개수를 Routine.afterCount에 저장
+     * routineId + 제품별 유저 선택(slot + KEEP/REMOVE) -> (routineId, productId, slot) 단위로 슬롯 선택 upsert
+     * + REMOVE인 슬롯 레코드 수를 Routine.afterCount에 저장.
+     * 오전/저녁 화면이 독립적으로 저장돼도 각자 자기 슬롯 레코드만 갱신하므로 병합 로직이 필요 없다.
+     * BOTH 제품은 슬롯 레코드가 2개(오전·저녁)라 양쪽 제거 시 자동으로 2, 한쪽만 제거하면 1이 된다.
      * @param routineId 루틴 식별자
-     * @param request   product id + status 목록
+     * @param request   product id + slot + action 목록
      * @return routineId
      */
     @Transactional
@@ -160,34 +174,29 @@ public class RoutineService {
         Map<Long, RoutineItem> itemMap = items.stream()
                 .collect(Collectors.toMap(item -> item.getProduct().getId(), Function.identity()));
 
-        for (SaveRoutineRequestDto.ProductStatus ps : request.getProducts()) {
+        for (SaveRoutineRequestDto.ProductSelection ps : request.getProducts()) {
             RoutineItem item = itemMap.get(ps.getId());
             if (item == null) {
                 throw new IllegalArgumentException("루틴에 없는 productId: " + ps.getId());
             }
-            item.applyUserStatus(ps.getStatus());
+            item.applyUserSelection(ps.getSlot(), ps.getAction());
         }
         routineItemRepository.saveAll(items);
 
-        // 제거 개수 -> afterCount (오전/오후 제거=1, 전체 제거=2)
-        int afterCount = items.stream()
-                .filter(item -> item.getStatus() != null)
-                .mapToInt(item -> item.getStatus().removedCount())
-                .sum();
-        routine.applyAfterCount(afterCount);
+        // 제거(REMOVE)로 선택된 슬롯 레코드 수 -> afterCount (BOTH 양쪽 제거 시 자동 2)
+        long afterCount = routineItemSelectionRepository.countByRoutineIdAndAction(routineId, RecommendStatus.REMOVE);
+        routine.applyAfterCount((int) afterCount);
         routineRepository.save(routine);
 
         return routine.getId();
     }
 
-    // 특정 슬롯(오전/오후)에 해당하는 제품만 골라 id + imageUrl + productName로 변환
-    private List<RoutineProductDto> filterBySlot(List<LlmRoutineItemDto> items,
-                                                 Map<Long, Product> productMap,
-                                                 RoutineSlot slot) {
+    // 사용자가 고른 슬롯(userRoutineSlot)이 해당 시간대(또는 BOTH)인 제품만 골라 id + imageUrl + productName로 변환
+    private List<RoutineProductDto> filterByUserSlot(List<RoutineItem> items, RoutineSlot slot) {
         return items.stream()
-                .filter(item -> item.recommended().slot() == slot || item.recommended().slot() == RoutineSlot.BOTH)
+                .filter(item -> matchesDay(item.getUserRoutineSlot(), slot))
                 .map(item -> {
-                    Product product = productMap.get(item.productId());
+                    Product product = item.getProduct();
                     String imageUrl = fileService.getPresignedUrl(product.getImageKey());
                     return new RoutineProductDto(product.getId(), imageUrl, product.getProductName());
                 })
@@ -202,6 +211,7 @@ public class RoutineService {
         for (Product product : products) {
             sb.append("=== productId: ").append(product.getId()).append(" ===\n");
             sb.append("productName: ").append(product.getProductName()).append("\n");
+            sb.append("category: ").append(product.getCategory().name()).append("\n");
             sb.append("recommended: ").append(product.getRecommended()).append("\n");
             sb.append("recommendReason: ").append(product.getRecommendReason()).append("\n");
             sb.append("ingredients: ").append(formatIngredients(product.getId())).append("\n\n");
