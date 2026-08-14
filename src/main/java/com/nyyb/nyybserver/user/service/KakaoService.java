@@ -4,8 +4,8 @@ import com.nyyb.nyybserver.common.response.ErrorCode;
 import com.nyyb.nyybserver.common.security.AuthTokens;
 import com.nyyb.nyybserver.common.security.JwtTokenProvider;
 import com.nyyb.nyybserver.user.data.dto.response.KakaoNotificationResponseDto;
-import com.nyyb.nyybserver.user.data.dto.response.KakaoProfileResponseDto;
 import com.nyyb.nyybserver.user.data.dto.response.KakaoTokenResponseDto;
+import com.nyyb.nyybserver.user.data.dto.response.KakaoUserInfoResponseDto;
 import com.nyyb.nyybserver.user.data.dto.response.SocialLoginResponseDto;
 import com.nyyb.nyybserver.user.data.entity.User;
 import com.nyyb.nyybserver.user.data.enums.AuthProvider;
@@ -98,13 +98,13 @@ public class KakaoService {
             throw new OAuthProcessException(ErrorCode.KAKAO_API_FAILED);
         }
 
-        KakaoProfileResponseDto profileResponse = kakaoOAuthClient.requestProfile(tokenResponse.getAccessToken());
-        if (profileResponse == null || profileResponse.getId() == null) {
+        KakaoUserInfoResponseDto userInfoResponse = kakaoOAuthClient.requestUserInfo(tokenResponse.getAccessToken());
+        if (userInfoResponse == null || userInfoResponse.getId() == null) {
             throw new OAuthProcessException(ErrorCode.KAKAO_API_FAILED);
         }
 
-        Long kakaoId = profileResponse.getId();
-        return new KakaoUserProfile(kakaoId, String.valueOf(kakaoId), profileResponse.getNickname());
+        Long kakaoId = userInfoResponse.getId();
+        return new KakaoUserProfile(kakaoId, String.valueOf(kakaoId), userInfoResponse.getNickname());
     }
 
     private Optional<User> findActiveGuest(Long guestUserId) {

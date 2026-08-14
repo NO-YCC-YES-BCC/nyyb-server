@@ -1,7 +1,7 @@
 package com.nyyb.nyybserver.user.service;
 
-import com.nyyb.nyybserver.user.data.dto.response.KakaoProfileResponseDto;
 import com.nyyb.nyybserver.user.data.dto.response.KakaoTokenResponseDto;
+import com.nyyb.nyybserver.user.data.dto.response.KakaoUserInfoResponseDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -85,13 +85,13 @@ public class KakaoOAuthClient {
         }
     }
 
-    public KakaoProfileResponseDto requestProfile(String accessToken) {
+    public KakaoUserInfoResponseDto requestUserInfo(String accessToken) {
         try {
             return restClient.get()
                     .uri("https://kapi.kakao.com/v2/user/me")
                     .header("Authorization", "Bearer " + accessToken)
                     .retrieve()
-                    .body(KakaoProfileResponseDto.class);
+                    .body(KakaoUserInfoResponseDto.class);
         } catch (RestClientResponseException e) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_GATEWAY,
