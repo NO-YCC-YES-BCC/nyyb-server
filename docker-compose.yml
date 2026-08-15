@@ -1,0 +1,57 @@
+# SOTT 배포 스택 (OCI VM) — nyyb-server + nginx
+# DB는 Aiven MySQL(외부)이라 여기서 띄우지 않는다.
+# 비밀값은 이 파일 옆의 .env에서 주입 (.env.example 참고)
+services:
+  sott-be:
+    build: .
+    restart: unless-stopped
+    expose:
+      - "8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+
+      DB_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
+      DB_URL: ${DB_URL}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL}
+      OPENAI_CHAT_TEMPERATURE: ${OPENAI_CHAT_TEMPERATURE}
+
+      CLOVA_OCR_API_URL: ${CLOVA_OCR_API_URL}
+      CLOVA_OCR_SECRET_KEY: ${CLOVA_OCR_SECRET_KEY}
+
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY: ${AWS_ACCESS_KEY}
+      AWS_SECRET_KEY: ${AWS_SECRET_KEY}
+
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+
+      # 프론트를 같은 오리진에서 서빙하므로 실제로는 거의 쓰이지 않는다
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot_conf:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot:ro
+    depends_on:
+      - sott-be
+
+volumes:
+  # 최초 1회 생성 필요:
+  #   docker volume create sott_certbot_conf
+  #   docker volume create sott_certbot_www
+  certbot_conf:
+    external: true
+    name: sott_certbot_conf
+  certbot_www:
+    external: true
+    name: sott_certbot_www
