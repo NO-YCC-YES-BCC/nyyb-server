@@ -31,6 +31,9 @@ public class Analysis {
     @JoinColumn(name = "user_id")
     private User user;
 
+    @Column
+    private String title; // 목록 표시용 문구 (예: "8월 3일 5개의 제품")
+
     @CreatedDate
     @Column(updatable = false)
     private LocalDateTime createdAt;

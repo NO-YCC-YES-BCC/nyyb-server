@@ -10,9 +10,12 @@ import java.util.UUID;
 
 public interface RoutineItemRepository extends JpaRepository<RoutineItem, Long> {
 
-    // 제품 fetch join (createRoutine에서 product 접근)
+    // 제품 fetch join (designRoutine에서 product 접근)
     @Query("select ri from RoutineItem ri " +
             "join fetch ri.product " +
             "where ri.routine.id = :routineId")
     List<RoutineItem> findByRoutineIdWithProduct(@Param("routineId") UUID routineId);
+
+    // 루틴에 담긴 제품 수 (루틴아이템 1 : 제품 1)
+    long countByRoutineId(UUID routineId);
 }

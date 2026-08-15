@@ -1,6 +1,6 @@
 package com.nyyb.nyybserver.analysis.service;
 
-import com.nyyb.nyybserver.analysis.data.dto.response.IngredientSummaryDto;
+import com.nyyb.nyybserver.analysis.data.dto.response.OcrIngredientDto;
 import com.nyyb.nyybserver.analysis.data.entity.Product;
 import com.nyyb.nyybserver.analysis.data.entity.ProductIngredient;
 import com.nyyb.nyybserver.analysis.data.enums.ProductCategory;
@@ -8,6 +8,7 @@ import com.nyyb.nyybserver.analysis.data.repository.ProductIngredientRepository;
 import com.nyyb.nyybserver.analysis.data.repository.ProductRepository;
 import com.nyyb.nyybserver.ingredient.data.entity.Ingredient;
 import com.nyyb.nyybserver.ingredient.service.IngredientIndex;
+import com.nyyb.nyybserver.user.data.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,33 +22,39 @@ import java.util.Map;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class AnalysisWriter {
+public class ProductWriter {
 
     private final ProductRepository productRepository;
     private final ProductIngredientRepository productIngredientRepository;
     private final IngredientIndex ingredientIndex;
+    private final UserRepository userRepository;
 
     // 저장 결과
     // 응답 조립에 필요한 값은 트랜잭션 안에서 미리 담아 반환
-    public record Result(Long productId, List<IngredientSummaryDto> ingredients) {
+    public record Result(Long productId, int ingredientCount, List<OcrIngredientDto> ingredients) {
     }
 
-    // 매칭된 성분 제품에 매핑
+    // 매칭된 성분 제품에 매핑. userId를 소유자로 지정해 이후 analyze 단계에서 소유권 검증이 가능하게 한다.
     @Transactional
-    public Result save(String imageKey, ProductCategory category, String ocrText) {
+    public Result save(Long userId, String imageKey, ProductCategory category, String ocrText) {
         Product product = Product.builder()
+                .user(userRepository.getReferenceById(userId))
                 .imageKey(imageKey)
                 .category(category)
                 .ocrText(ocrText)
                 .build();
         productRepository.save(product);
 
-        List<IngredientSummaryDto> ingredients = matchIngredients(ocrText, product);
-        return new Result(product.getId(), ingredients);
+        List<OcrIngredientDto> ingredients = matchIngredients(ocrText, product);
+
+        // 매칭된 성분 갯수를 제품에 반영(더티 체킹)
+        product.updateIngredientCount(ingredients.size());
+
+        return new Result(product.getId(), ingredients.size(), ingredients);
     }
 
     // ocrText -> 성분 인덱스 조회 -> ProductIngredient 저장 후 요약 반환
-    private List<IngredientSummaryDto> matchIngredients(String ocrText, Product product) {
+    private List<OcrIngredientDto> matchIngredients(String ocrText, Product product) {
         if (!StringUtils.hasText(ocrText)) {
             return List.of();
         }
@@ -82,12 +89,12 @@ public class AnalysisWriter {
         productIngredientRepository.saveAll(matched.values());
 
         return matched.values().stream()
-                .map(pi -> toSummary(pi.getIngredient()))
+                .map(pi -> toOcrIngredient(pi.getIngredient()))
                 .toList();
     }
 
-    private IngredientSummaryDto toSummary(Ingredient ingredient) {
-        return IngredientSummaryDto.builder()
+    private OcrIngredientDto toOcrIngredient(Ingredient ingredient) {
+        return OcrIngredientDto.builder()
                 .ingredientId(ingredient.getId())
                 .name(ingredient.getName())
                 .isToxic(ingredient.getIsToxic())

@@ -10,7 +10,7 @@ import java.util.UUID;
 
 public interface RoutineItemSelectionRepository extends JpaRepository<RoutineItemSelection, Long> {
 
-    // 루틴 전체에서 유저가 제거(REMOVE)로 선택한 슬롯 레코드 수 (BOTH 양쪽 제거 시 자동 2)
+    // 루틴 전체에서 유저가 해당 action(KEEP/REMOVE)으로 선택한 슬롯 레코드 수 (BOTH 양쪽 선택 시 자동 2)
     @Query("select count(s) from RoutineItemSelection s " +
             "where s.routineItem.routine.id = :routineId and s.action = :action")
     long countByRoutineIdAndAction(@Param("routineId") UUID routineId,

@@ -59,7 +59,7 @@ public class RoutineItem {
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
-    // createRoutine 단계에서 LLM 루틴 설계 결과(슬롯/추천/이유)를 반영
+    // designRoutine 단계에서 LLM 루틴 설계 결과(슬롯/추천/이유)를 반영
     public void applyLlmRoutine(RoutineSlot llmRoutineSlot, RecommendStatus recommended, String recommendReason) {
         this.llmRoutineSlot = llmRoutineSlot;
         this.recommended = recommended;

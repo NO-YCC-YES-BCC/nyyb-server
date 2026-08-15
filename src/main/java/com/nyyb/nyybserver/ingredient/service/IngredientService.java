@@ -4,12 +4,16 @@ import com.nyyb.nyybserver.analysis.data.entity.ProductIngredient;
 import com.nyyb.nyybserver.analysis.data.repository.ProductIngredientRepository;
 import com.nyyb.nyybserver.ingredient.data.dto.response.AllergicDto;
 import com.nyyb.nyybserver.ingredient.data.dto.response.IngredientDto;
+import com.nyyb.nyybserver.ingredient.data.dto.response.IngredientSummaryDto;
 import com.nyyb.nyybserver.ingredient.data.dto.response.IngredientMatchResponseDto;
 import com.nyyb.nyybserver.ingredient.data.entity.Allergic;
 import com.nyyb.nyybserver.ingredient.data.entity.Ingredient;
 import com.nyyb.nyybserver.ingredient.data.repository.AllergicRepository;
+import com.nyyb.nyybserver.ingredient.data.exception.IngredientNotFoundException;
+import com.nyyb.nyybserver.ingredient.data.repository.IngredientRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +28,34 @@ public class IngredientService {
 
     private final ProductIngredientRepository productIngredientRepository;
     private final AllergicRepository allergicRepository;
+    private final IngredientRepository ingredientRepository;
+
+    /**
+     * 전체 성분을 이름순으로 페이징 조회한다. (정렬 조건은 받지 않고 이름 → id 순으로 고정)
+     *
+     * @param pageable page/size 페이징 정보
+     * @return 성분 목록
+     */
+    @Transactional(readOnly = true)
+    public List<IngredientSummaryDto> getIngredients(Pageable pageable) {
+        return ingredientRepository.findAllByOrderByNameAscIdAsc(pageable).stream()
+                .map(IngredientSummaryDto::from)
+                .toList();
+    }
+
+    /**
+     * 성분 id로 성분 상세를 조회한다.
+     *
+     * @param ingredientId 조회할 성분 id
+     * @return 성분 상세
+     * @throws IngredientNotFoundException 해당 id의 성분이 없는 경우
+     */
+    @Transactional(readOnly = true)
+    public IngredientDto getIngredient(Long ingredientId) {
+        Ingredient ingredient = ingredientRepository.findById(ingredientId)
+                .orElseThrow(IngredientNotFoundException::new);
+        return IngredientDto.from(ingredient);
+    }
 
     /**
      * 복수 제품의 성분을 모아 RiskLevel이 null인 성분은 제외하고, 남은 성분을 알레르기 유발 물질 DB와 매칭한다.

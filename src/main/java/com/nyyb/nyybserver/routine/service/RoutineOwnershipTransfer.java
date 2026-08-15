@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * 게스트→소셜 병합 시 게스트가 만든 Routine 소유권을 소셜 유저로 이전한다.
- * KakaoService가 병합 트랜잭션 안에서 호출한다.
+ * AuthService가 병합 트랜잭션 안에서 호출한다.
  */
 @Component
 @RequiredArgsConstructor

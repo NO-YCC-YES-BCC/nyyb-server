@@ -6,7 +6,7 @@ import com.nyyb.nyybserver.user.data.dto.request.KakaoLoginRequestDto;
 import com.nyyb.nyybserver.user.data.dto.request.KakaoNotificationRequestDto;
 import com.nyyb.nyybserver.user.data.dto.response.KakaoNotificationResponseDto;
 import com.nyyb.nyybserver.user.data.dto.response.SocialLoginResponseDto;
-import com.nyyb.nyybserver.user.service.KakaoService;
+import com.nyyb.nyybserver.user.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,13 +20,13 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @RequestMapping("/auth")
 @Tag(name = "Auth", description = "Guest and Kakao social login APIs")
-public class UserController {
-    private final KakaoService kakaoService;
+public class AuthController {
+    private final AuthService authService;
 
     @Operation(summary = "Create guest JWT", description = "Creates a guest user and returns JWT tokens.")
     @PostMapping("/guest")
     public ResponseEntity<SocialLoginResponseDto> guestLogin() {
-        return ResponseEntity.ok(kakaoService.createGuest());
+        return ResponseEntity.ok(authService.createGuest());
     }
 
     @Operation(
@@ -39,7 +39,7 @@ public class UserController {
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal principal
     ) {
         String code = request == null ? null : request.getCode();
-        return ResponseEntity.ok(kakaoService.kakaoLogin(code, guestUserId(principal)));
+        return ResponseEntity.ok(authService.kakaoLogin(code, guestUserId(principal)));
     }
 
     @Operation(
@@ -51,7 +51,7 @@ public class UserController {
             @RequestParam String code,
             @Parameter(hidden = true) @AuthenticationPrincipal UserPrincipal principal
     ) {
-        return ResponseEntity.ok(kakaoService.kakaoLogin(code, guestUserId(principal)));
+        return ResponseEntity.ok(authService.kakaoLogin(code, guestUserId(principal)));
     }
 
     private Long guestUserId(UserPrincipal principal) {
@@ -59,10 +59,10 @@ public class UserController {
     }
 
     @PatchMapping("/notify-kakao")
-    public ResponseEntity<Void> updatekakoNotification(@RequestBody KakaoNotificationRequestDto kakaoNotificationRequestDto) {
+    public ResponseEntity<Void> updateKakaoNotification(@RequestBody KakaoNotificationRequestDto request) {
         Long userId = SecurityUtil.getUserId();
 
-        kakaoService.updateKakaoNotification(userId, kakaoNotificationRequestDto.enabled());
+        authService.updateKakaoNotification(userId, request.enabled());
 
         return ResponseEntity.noContent().build();
     }
@@ -72,7 +72,7 @@ public class UserController {
         Long userId = SecurityUtil.getUserId();
 
         return ResponseEntity.ok(
-                kakaoService.getKakaoNotification(userId)
+                authService.getKakaoNotification(userId)
         );
     }
 }

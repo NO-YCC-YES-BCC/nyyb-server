@@ -6,7 +6,7 @@ import lombok.Data;
 
 @Data
 @Builder
-public class IngredientSummaryDto {
+public class OcrIngredientDto {
 
     private Long ingredientId;
     private String name;
