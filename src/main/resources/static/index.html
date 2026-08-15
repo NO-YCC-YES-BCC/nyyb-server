@@ -146,7 +146,10 @@ p{margin:0 0 12px;color:var(--ink-60)}
     </div>
   </div>
   <input type="file" id="cam" accept="image/*" capture="environment" class="hidden">
+  <!-- capture 속성이 없어야 카메라 대신 사진첩이 열린다 -->
+  <input type="file" id="pick" accept="image/*" multiple class="hidden">
   <button class="btn" id="open-cam">카메라 열기</button>
+  <button class="btn ghost" id="open-pick">사진첩에서 선택</button>
   <button class="btn ghost" id="back-landing">뒤로</button>
 </section>
 
@@ -156,6 +159,7 @@ p{margin:0 0 12px;color:var(--ink-60)}
   <p class="small" id="list-sub">3개 이상이면 분석할 수 있어요</p>
   <div id="rows"></div>
   <button class="btn ghost" id="add-more" style="margin-top:14px">제품 더 찍기</button>
+  <button class="btn ghost" id="add-more-pick">사진첩에서 추가</button>
   <button class="btn" id="start-analysis" disabled>분석 시작</button>
 </section>
 
@@ -648,15 +652,12 @@ track('view_landing');
 
 $('#go-capture').onclick = ()=>{ track('start_capture'); show('guide'); };
 $('#back-landing').onclick = ()=> show('landing');
-$('#open-cam').onclick   = ()=> $('#cam').click();
-$('#add-more').onclick   = ()=> $('#cam').click();
+$('#open-cam').onclick      = ()=> $('#cam').click();
+$('#add-more').onclick      = ()=> $('#cam').click();
+$('#open-pick').onclick     = ()=> $('#pick').click();
+$('#add-more-pick').onclick = ()=> $('#pick').click();
 
-$('#cam').onchange = async e=>{
-  const file = e.target.files[0];
-  e.target.value = '';
-  if(!file) return;
-
-  show('list');
+async function addPhoto(file){
   const idx = items.length;
   items.push({productId:null, recognizedCount:0, qualityWarning:'UPLOADING', preview:''});
   renderList();
@@ -674,7 +675,20 @@ $('#cam').onchange = async e=>{
     track('photo_upload_failed');
   }
   renderList();
-};
+}
+
+// 카메라·사진첩 공용. 사진첩은 여러 장 선택 가능하므로 순서대로 하나씩 올린다.
+async function onFiles(e){
+  const files = [...e.target.files];
+  e.target.value = '';
+  if(!files.length) return;
+
+  show('list');
+  for(const file of files) await addPhoto(file);
+}
+
+$('#cam').onchange  = onFiles;
+$('#pick').onchange = onFiles;
 
 $('#start-analysis').onclick = async ()=>{
   const ids = items.filter(i=>!i.qualityWarning && i.productId).map(i=>i.productId);
