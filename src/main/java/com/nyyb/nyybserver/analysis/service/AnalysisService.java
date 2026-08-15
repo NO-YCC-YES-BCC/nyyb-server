@@ -163,6 +163,21 @@ public class AnalysisService {
         return new AnalysisResponseDto(routineId, analysis.getTitle(), products);
     }
 
+    /**
+     * 분석 삭제. 실제 행을 지우지 않고 소유자만 해제해 유저의 목록·상세에서 사라지게 한다.
+     * (제품·루틴 등 참조 데이터를 그대로 살려두기 위해 소프트 삭제로 처리)
+     * @param analysisId 삭제할 분석 id
+     * @param userId     소유자 id (본인 분석만 삭제 가능)
+     * @throws AnalysisNotFoundException 해당 id의 분석이 없거나 본인 소유가 아닌 경우
+     */
+    @Transactional
+    public void deleteAnalysis(UUID analysisId, Long userId) {
+        Analysis analysis = analysisRepository.findByIdAndUserId(analysisId, userId)
+                .orElseThrow(AnalysisNotFoundException::new);
+
+        analysis.releaseOwner();
+    }
+
     // 한국 기준 오늘 날짜 + 제품 개수 -> "8월 3일 5개의 제품"
     private String buildTitle(int productCount) {
         LocalDate today = LocalDate.now(KOREA_ZONE);

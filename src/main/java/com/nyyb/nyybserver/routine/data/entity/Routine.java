@@ -69,4 +69,9 @@ public class Routine {
     public void applyAfterCount(Integer afterCount) {
         this.afterCount = afterCount;
     }
+
+    // 삭제 요청 시 소유자만 해제한다(데이터는 남기고 유저 목록/상세에서만 사라짐)
+    public void releaseOwner() {
+        this.user = null;
+    }
 }

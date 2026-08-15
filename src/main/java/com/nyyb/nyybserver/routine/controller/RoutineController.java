@@ -43,6 +43,13 @@ public class RoutineController {
         return GlobalResponse.ok(routineService.getRoutine(routineId, SecurityUtil.getUserId()));
     }
 
+    // 루틴 삭제 (소유자만 해제하는 소프트 삭제)
+    @DeleteMapping("/{routineId}")
+    public GlobalResponse<Void> deleteRoutine(@PathVariable UUID routineId) {
+        routineService.deleteRoutine(routineId, SecurityUtil.getUserId());
+        return GlobalResponse.ok();
+    }
+
     @PostMapping("/{routineId}/design")
     public GlobalResponse<RoutineDesignResponseDto> designRoutine(@PathVariable UUID routineId) {
         return GlobalResponse.ok(routineService.designRoutine(routineId, SecurityUtil.getUserId()));

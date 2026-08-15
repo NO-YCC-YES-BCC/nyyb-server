@@ -190,6 +190,21 @@ public class RoutineService {
         );
     }
 
+    /**
+     * 루틴 삭제. 실제 행을 지우지 않고 소유자만 해제해 유저의 목록·상세에서 사라지게 한다.
+     * (루틴 아이템·유저 선택 등 참조 데이터를 그대로 살려두기 위해 소프트 삭제로 처리)
+     * @param routineId 삭제할 루틴 id
+     * @param userId    소유자 id (본인 루틴만 삭제 가능)
+     * @throws RoutineNotFoundException 해당 id의 루틴이 없거나 본인 소유가 아닌 경우
+     */
+    @Transactional
+    public void deleteRoutine(UUID routineId, Long userId) {
+        Routine routine = routineRepository.findByIdAndUserId(routineId, userId)
+                .orElseThrow(RoutineNotFoundException::new);
+
+        routine.releaseOwner();
+    }
+
     // 하루를 반으로 나눠 KST 12시 이전이면 MORNING, 이후면 EVENING
     private RoutineSlot currentSlot() {
         return LocalTime.now(KOREA_ZONE).getHour() < NOON_HOUR ? RoutineSlot.MORNING : RoutineSlot.EVENING;

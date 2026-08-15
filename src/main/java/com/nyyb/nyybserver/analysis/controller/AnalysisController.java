@@ -49,4 +49,11 @@ public class AnalysisController {
     public GlobalResponse<AnalysisResponseDto> getAnalysis(@PathVariable UUID analysisId) {
         return GlobalResponse.ok(analysisService.getAnalysis(analysisId, SecurityUtil.getUserId()));
     }
+
+    // 분석 삭제 (소유자만 해제하는 소프트 삭제)
+    @DeleteMapping("/{analysisId}")
+    public GlobalResponse<Void> deleteAnalysis(@PathVariable UUID analysisId) {
+        analysisService.deleteAnalysis(analysisId, SecurityUtil.getUserId());
+        return GlobalResponse.ok();
+    }
 }
