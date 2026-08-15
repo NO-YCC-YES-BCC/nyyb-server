@@ -6,6 +6,7 @@ import com.nyyb.nyybserver.routine.data.dto.request.SaveRoutineRequestDto;
 import com.nyyb.nyybserver.routine.data.dto.response.CreateRoutineResponseDto;
 import com.nyyb.nyybserver.routine.data.dto.response.RoutineDayResponseDto;
 import com.nyyb.nyybserver.routine.service.RoutineService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,16 +16,17 @@ import java.util.UUID;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/routines")
+@Tag(name = "Routine", description = "Routine design and daily routine APIs")
 public class RoutineController {
 
     private final RoutineService routineService;
 
-    @PostMapping("/{routineId}")
-    public GlobalResponse<CreateRoutineResponseDto> createRoutine(@PathVariable UUID routineId) {
+    @PostMapping("/{routineId}/design")
+    public GlobalResponse<CreateRoutineResponseDto> designRoutine(@PathVariable UUID routineId) {
         return GlobalResponse.ok(routineService.createRoutine(routineId));
     }
 
-    @GetMapping("/day/{routineId}")
+    @GetMapping("/{routineId}/day")
     public GlobalResponse<RoutineDayResponseDto> getRoutineDay(@PathVariable UUID routineId,
                                                                @RequestParam String slot) {
         return GlobalResponse.ok(routineService.getRoutineDay(routineId, parseSlot(slot)));

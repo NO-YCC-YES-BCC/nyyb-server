@@ -6,6 +6,7 @@ import com.nyyb.nyybserver.analysis.data.dto.response.OcrResponseDto;
 import com.nyyb.nyybserver.analysis.service.AnalysisService;
 import com.nyyb.nyybserver.analysis.service.OcrService;
 import com.nyyb.nyybserver.common.response.GlobalResponse;
+import com.nyyb.nyybserver.common.security.SecurityUtil;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -28,6 +29,6 @@ public class AnalysisController {
 
     @PostMapping
     public GlobalResponse<AnalysisResponseDto> analyze(@RequestBody AnalysisRequestDto request) {
-        return GlobalResponse.ok(analysisService.analyze(request));
+        return GlobalResponse.ok(analysisService.analyze(request, SecurityUtil.getUserId()));
     }
 }

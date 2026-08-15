@@ -16,6 +16,8 @@ import com.nyyb.nyybserver.routine.data.entity.Routine;
 import com.nyyb.nyybserver.routine.data.entity.RoutineItem;
 import com.nyyb.nyybserver.routine.data.repository.RoutineItemRepository;
 import com.nyyb.nyybserver.routine.data.repository.RoutineRepository;
+import com.nyyb.nyybserver.user.data.entity.User;
+import com.nyyb.nyybserver.user.data.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -36,18 +38,23 @@ public class AnalysisService {
     private final ProductIngredientRepository productIngredientRepository;
     private final RoutineRepository routineRepository;
     private final RoutineItemRepository routineItemRepository;
+    private final UserRepository userRepository;
 
     /**
      * 제품들 -> LLM 제외/유지 분석 -> Product·Analysis 반영 -> Routine·RoutineItem 생성(saveRoutine 통합) -> routineId + LLM 응답 반환
      * @param request productId + userRoutineSlot 목록
+     * @param userId  소유자로 지정할 현재 로그인 유저 id(게스트/카카오 공통)
      * @return AnalysisResponseDto (routineId + 제품별 분석 결과)
      */
     @Transactional
-    public AnalysisResponseDto analyze(AnalysisRequestDto request) {
+    public AnalysisResponseDto analyze(AnalysisRequestDto request, Long userId) {
         List<AnalysisRequestDto.ProductSlot> productSlots = request.getProducts();
         List<Long> productIds = productSlots.stream()
                 .map(AnalysisRequestDto.ProductSlot::getProductId)
                 .toList();
+
+        // 현재 로그인 사용자(게스트/카카오 공통)를 소유자로 지정
+        User owner = userRepository.getReferenceById(userId);
 
         String userMessage = buildUserMessage(productIds);
         log.info("OpenAI 요청 메시지:\n{}", userMessage);
@@ -61,11 +68,12 @@ public class AnalysisService {
         log.info("OpenAI 응답:\n{}", llmResponse);
 
         // Analysis 저장 후 결과를 각 Product에 반영(더티 체킹)
-        Analysis analysis = analysisRepository.save(Analysis.builder().build());
+        Analysis analysis = analysisRepository.save(Analysis.builder().user(owner).build());
         llmResponse.products().forEach(result -> applyToProduct(analysis, result));
 
         // saveRoutine 통합: 분석 1개당 Routine 1개 생성 + productId별 userRoutineSlot을 RoutineItem으로 저장
         Routine routine = routineRepository.save(Routine.builder()
+                .user(owner)
                 .analysis(analysis)
                 .beforeCount(productIds.size())
                 .build());
