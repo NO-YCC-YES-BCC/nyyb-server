@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>소트 — 지금 쓰는 화장품, 전부 필요할까요</title>
+<meta name="description" content="쓰고 있는 화장품 뒷면을 찍으면 겹치는 성분을 찾아 뺄 것을 알려드립니다.">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+:root{
+  --paper:#FBFBFA;
+  --ink:#16181C;
+  --ink-60:#5A5F66;
+  --ink-30:#A8ADB4;
+  --rule:#E2E3E0;
+  --mark:#1B3A8F;
+  --mark-bg:#EAEEF8;
+  --warn:#8A5A00;
+  --warn-bg:#FBF2DF;
+  --r:10px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);color:var(--ink);
+  font-family:'Pretendard Variable',Pretendard,-apple-system,system-ui,sans-serif;
+  font-size:16px;line-height:1.6;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.wrap{max-width:520px;margin:0 auto;padding:0 20px}
+
+/* 모든 단계 좌측 상단에 노출되는 워드마크 */
+.brand{
+  font-size:19px;font-weight:700;letter-spacing:.14em;
+  color:var(--ink);padding:22px 0 0;
+}
+.step{display:none;padding:32px 0 48px}
+.step.on{display:block}
+
+h1{font-size:27px;line-height:1.35;font-weight:700;letter-spacing:-0.02em;margin:0 0 14px}
+h2{font-size:20px;line-height:1.4;font-weight:600;letter-spacing:-0.02em;margin:0 0 8px}
+p{margin:0 0 12px;color:var(--ink-60)}
+.small{font-size:13px;color:var(--ink-30);line-height:1.65}
+
+/* 전성분 인쇄물 — 이 페이지의 시그니처 */
+.label-card{
+  border:1px solid var(--rule);border-radius:var(--r);background:#fff;
+  padding:14px;margin:22px 0;
+}
+.label-head{font-size:10px;letter-spacing:.14em;color:var(--ink-30);margin-bottom:8px}
+.label-body{
+  font-size:11.5px;line-height:1.85;color:var(--ink-60);
+  letter-spacing:-0.01em;word-break:keep-all;
+}
+.hl{background:var(--mark-bg);color:var(--mark);font-weight:600;border-radius:3px;padding:0 2px}
+.label-foot{
+  margin-top:10px;padding-top:10px;border-top:1px solid var(--rule);
+  font-size:12px;color:var(--mark);font-weight:600;
+}
+
+.btn{
+  display:block;width:100%;border:0;border-radius:var(--r);
+  background:var(--ink);color:#fff;font:inherit;font-weight:600;font-size:16px;
+  padding:16px;cursor:pointer;margin-top:8px;
+}
+.btn:disabled{background:var(--ink-30);cursor:default}
+.btn.ghost{background:transparent;color:var(--ink-60);border:1px solid var(--rule);font-weight:500}
+.btn:focus-visible,a:focus-visible{outline:2px solid var(--mark);outline-offset:2px}
+
+.rule{height:1px;background:var(--rule);margin:26px 0}
+.row{display:flex;gap:12px;align-items:center;padding:13px 0;border-top:1px solid var(--rule)}
+.row:last-of-type{border-bottom:1px solid var(--rule)}
+.thumb{width:44px;height:44px;border-radius:6px;object-fit:cover;background:var(--rule);flex:0 0 auto}
+.row .meta{flex:1;min-width:0}
+.row .nm{font-size:14px;font-weight:500}
+.row .sub{font-size:12px;color:var(--ink-30)}
+.row .sub.warn{color:var(--warn)}
+.del{background:0;border:0;color:var(--ink-30);font-size:20px;padding:4px 6px;cursor:pointer;line-height:1}
+
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;vertical-align:2px}
+.b-calc{background:var(--mark-bg);color:var(--mark)}
+.b-reg{background:#E9F1EC;color:#245C3D}
+.b-ref{background:#F0EFEC;color:#6B6357}
+
+.card{border:1px solid var(--rule);border-radius:var(--r);padding:14px;margin-bottom:10px;background:#fff}
+.card.warn{background:var(--warn-bg);border-color:#EFDFB8}
+.card .t{font-size:15px;font-weight:600;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.card .d{font-size:13px;color:var(--ink-60);margin-top:7px;line-height:1.65}
+.card .why{font-size:13px;color:var(--ink-60);margin-top:9px;padding-top:9px;border-top:1px solid var(--rule)}
+
+/* 겹치는 성분 — 길어서 접었다 폈다 */
+.ov>summary{
+  font-size:16px;font-weight:600;letter-spacing:-0.02em;
+  cursor:pointer;list-style:none;padding:6px 0 14px;
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+}
+.ov>summary::-webkit-details-marker{display:none}
+.ov>summary::after{content:'펼치기';font-size:13px;font-weight:500;color:var(--ink-30);flex:0 0 auto}
+.ov[open]>summary::after{content:'접기'}
+.ov>summary:focus-visible{outline:2px solid var(--mark);outline-offset:2px}
+
+.spin{width:34px;height:34px;border:3px solid var(--rule);border-top-color:var(--ink);border-radius:50%;animation:sp .9s linear infinite;margin:0 auto}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:2.4s}}
+.center{text-align:center}
+
+.ask{border:1px solid var(--rule);border-radius:var(--r);padding:18px;margin-top:26px;background:#fff}
+.ask .q{font-size:15px;font-weight:600;line-height:1.5;word-break:keep-all}
+.ask .opts{display:flex;gap:8px;margin-top:14px}
+.ask .opts .btn{margin-top:0}
+.thx{font-size:14px;color:var(--mark);font-weight:600;margin-top:12px;display:none}
+
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="brand">SOTT</header>
+
+<!-- 1 · 랜딩 -->
+<section id="s-landing" class="step on">
+  <h1>지금 쓰는 화장품,<br>전부 필요할까요?</h1>
+  <p>제품 뒷면만 찍으면 겹치는 성분을 찾아드려요. 가입 없이 3분이면 됩니다.</p>
+
+  <div class="label-card">
+    <div class="label-head">전성분</div>
+    <div class="label-body" id="demo-label"></div>
+    <div class="label-foot" id="demo-foot"></div>
+  </div>
+
+  <p class="small">제품마다 이름을 다르게 적어서 사람 눈으로는 찾기 어렵습니다. 정제수·물·Water·Aqua가 모두 같은 성분입니다.</p>
+  <button class="btn" id="go-capture">화장품 찍어보기</button>
+  <p class="small center" style="margin-top:14px">업로드한 사진은 분석에만 쓰이고 이후 삭제됩니다. 베타 서비스입니다.</p>
+</section>
+
+<!-- 2 · 촬영 안내 -->
+<section id="s-guide" class="step">
+  <h2>성분이 적힌 면을 찍어주세요</h2>
+  <p>3개 이상이면 겹치는 성분을 찾을 수 있어요.</p>
+  <div class="label-card">
+    <div class="label-body" style="font-size:13px;line-height:2">
+      성분 적힌 면이 화면을 채우게<br>
+      그림자가 지지 않게<br>
+      둥근 면은 최대한 펴서
+    </div>
+  </div>
+  <input type="file" id="cam" accept="image/*" capture="environment" class="hidden">
+  <button class="btn" id="open-cam">카메라 열기</button>
+  <button class="btn ghost" id="back-landing">뒤로</button>
+</section>
+
+<!-- 3 · 제품 목록 -->
+<section id="s-list" class="step">
+  <h2 id="list-title">1개 찍었어요</h2>
+  <p class="small" id="list-sub">3개 이상이면 분석할 수 있어요</p>
+  <div id="rows"></div>
+  <button class="btn ghost" id="add-more" style="margin-top:14px">제품 더 찍기</button>
+  <button class="btn" id="start-analysis" disabled>분석 시작</button>
+</section>
+
+<!-- 4 · 분석 중 -->
+<section id="s-loading" class="step center" style="padding-top:110px">
+  <div class="spin"></div>
+  <h2 style="margin-top:22px">성분 읽는 중</h2>
+  <p class="small">1분쯤 걸려요. 화면을 켜둔 채로 기다려주세요.</p>
+</section>
+
+<!-- 5 · 결과 -->
+<section id="s-result" class="step">
+  <h1 id="r-head"></h1>
+  <p class="small" id="r-sub"></p>
+  <div id="r-remove" style="margin-top:20px"></div>
+  <div id="r-keep"></div>
+  <div id="r-overlap"></div>
+  <p class="small" id="r-unmatched"></p>
+
+  <div class="ask" id="ask">
+    <div class="q">새로 살 화장품이 지금 쓰는 것과 겹치는지 확인하는 기능, 1회 500원이면 쓰시겠어요?</div>
+    <div class="opts">
+      <button class="btn" data-w="yes">쓸 것 같아요</button>
+      <button class="btn ghost" data-w="no">안 쓸 것 같아요</button>
+    </div>
+    <div class="thx" id="thx">답변 고맙습니다.</div>
+  </div>
+
+  <button class="btn ghost" id="again" style="margin-top:26px">처음부터 다시</button>
+</section>
+
+<!-- 오류 -->
+<section id="s-error" class="step center" style="padding-top:90px">
+  <h2>분석을 끝내지 못했어요</h2>
+  <p class="small" id="err-msg"></p>
+  <button class="btn" id="retry">다시 시도</button>
+</section>
+
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   설정 — 여기만 고치면 됩니다
+   ══════════════════════════════════════════════════════ */
+const CONFIG = {
+  MOCK: false,                     // true = 서버 없이 프론트만 테스트 (목업 그대로 남겨둠)
+  API: '',                         // 같은 오리진에서 서빙하므로 상대경로 (별도 도메인 쓰면 여기에 주소)
+  META_PIXEL_ID: '',               // 픽셀 ID (없으면 빈칸)
+  MIN_PRODUCTS: 3,
+  MAX_LONG_EDGE: 2200,             // 리사이즈 긴 변 px
+  JPEG_QUALITY: 0.85,
+  POLL_MS: 2000,
+  POLL_MAX: 60,
+  MIN_INGREDIENTS: 5,              // 이보다 적게 읽히면 다시 찍게 안내 (서버가 품질값을 안 내려줌)
+  ROUTINE_SLOT: 'BOTH'             // 백엔드 필수값. 이 페이지엔 슬롯 선택 UI가 없어 BOTH 고정
+};
+
+/* 겹침 성분 중 알레르기 유발물질로 매칭된 항목에 붙는 안내 (기존 문구 그대로 사용) */
+const REGULATION_NOTE = '전성분에 적혀 있다는 건 표시 기준 이상 들어 있다는 뜻이에요';
+
+/* 백엔드 응답 모양이 다르면 이 함수만 고치세요
+   - 목업(MOCK_RESULT)은 이미 최종 모양이므로 그대로 통과시킵니다
+   - 서버 응답은 아래 fromServer()에서 최종 모양으로 변환합니다 */
+function normalizeResult(raw){
+  if(raw && (raw.removeList || raw.keepList || raw.overlaps)){
+    return {
+      removeList : raw.removeList  || [],   // [{name, reason, why, overlapCount}]
+      keepList   : raw.keepList    || [],   // [{name, note}]
+      overlaps   : raw.overlaps    || [],   // [{name, products:[], layer, source, note}]
+      unmatched  : raw.unmatched   || [],   // ["성분명"]
+      partial    : raw.partial     || false
+    };
+  }
+  return fromServer(raw || {});
+}
+
+/* renderResult가 innerHTML을 쓰므로 서버에서 온 문자열은 여기서 이스케이프 */
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* 백엔드 normalize 규칙과 동일: 소문자 + 공백 제거 */
+const normName = s => String(s ?? '').toLowerCase().replace(/\s+/g,'');
+
+/*
+  서버 응답 -> 화면이 기대하는 모양
+  raw = {
+    analysis : POST /analyses 의 data              (LLM 실패 시 null)
+    match    : GET /ingredients?productIds= 의 data (실패 시 null)
+    products : [{productId, label, ingredients:[{ingredientId,name}]}]  업로드 때 받아둔 제품별 성분
+    partial  : LLM 제안만 실패했는지
+  }
+*/
+function fromServer(raw){
+  const products   = raw.products || [];
+  const analysis   = raw.analysis || null;
+  const llmProduct = (analysis && analysis.products) || [];
+  const allergics  = (raw.match && raw.match.allergics) || [];
+
+  // productId -> 화면에 쓸 이름 (LLM이 읽은 제품명 우선, 없으면 목록 화면과 같은 "제품 N")
+  const nameOf = {};
+  products.forEach(p => { nameOf[p.productId] = p.label; });
+  llmProduct.forEach(p => {
+    // 성분면만 찍으면 라벨에 제품명이 없어서 LLM이 productName 자리에 productId나
+    // "전성분" 같은 인쇄물 제목을 넣는다. 그럴 땐 목록 화면과 같은 "제품 N"을 쓴다.
+    const nm = String(p.productName ?? '').trim();
+    if(nm && !/^\d+$/.test(nm) && nm !== '전성분') nameOf[p.productId] = nm;
+  });
+  // 같은 이름이 두 제품 이상에 붙으면 어느 걸 빼라는 건지 구분이 안 되므로 번호로 되돌린다
+  const nameCount = {};
+  Object.values(nameOf).forEach(nm => { nameCount[nm] = (nameCount[nm] || 0) + 1; });
+  products.forEach(p => { if(nameCount[nameOf[p.productId]] > 1) nameOf[p.productId] = p.label; });
+
+  // recommendReason의 "제품 27번과 …" / "27번 제품과 …"에서 27은 순번이 아니라 productId다.
+  // 화면에 쓰는 이름으로 바꾸고, 뒤따르는 조사(와/과)를 받침에 맞춘다.
+  const hasBatchim = s => {
+    const c = String(s).trim().slice(-1);
+    if(/[0-9]/.test(c)) return '013678'.includes(c);   // 영·일·삼·육·칠·팔
+    const code = c.charCodeAt(0);
+    if(code >= 0xAC00 && code <= 0xD7A3) return (code - 0xAC00) % 28 !== 0;
+    return true;
+  };
+  const josa = (nm, p) => p ? nm + (hasBatchim(nm) ? '과' : '와') : nm;
+  const relabel = t => String(t || '')
+    .replace(/제품\s*(\d+)\s*번\s*(과|와)?/g, (m, id, p) => nameOf[id] ? josa(nameOf[id], p) : m)
+    .replace(/(\d+)\s*번\s*제품\s*(과|와)?/g, (m, id, p) => nameOf[id] ? josa(nameOf[id], p) : m);
+
+  // 성분 -> 등장한 제품들 (2개 이상이면 겹침)
+  //   서버는 겹침 판정을 내려주지 않으므로 제품별 성분 목록(OCR 응답)으로 프론트에서 교집합을 낸다
+  const byIngredient = new Map();
+  products.forEach(p => (p.ingredients || []).forEach(ing => {
+    const key = ing.ingredientId ?? normName(ing.name);
+    if(!byIngredient.has(key)) byIngredient.set(key, {name: ing.name, ids: []});
+    const entry = byIngredient.get(key);
+    if(!entry.ids.includes(p.productId)) entry.ids.push(p.productId);
+  }));
+
+  // 알레르기 유발물질로 매칭된 성분은 규제 레이어
+  const allergicByName = {};
+  allergics.forEach(a => { allergicByName[normName(a.name)] = a; });
+
+  const overlaps = [...byIngredient.values()]
+    .filter(e => e.ids.length >= 2)
+    .sort((a,b) => b.ids.length - a.ids.length)
+    .map(e => {
+      const al = allergicByName[normName(e.name)];
+      return {
+        name    : esc(e.name),
+        products: e.ids.map(id => esc(nameOf[id])),
+        layer   : al ? 'REGULATION' : 'CALCULATION',
+        source  : al ? esc(al.dataSource || '') : '',
+        note    : al ? REGULATION_NOTE : ''
+      };
+    });
+
+  // 제품별로 다른 제품과 겹친 성분 개수
+  const overlapCountOf = {};
+  [...byIngredient.values()].filter(e => e.ids.length >= 2)
+    .forEach(e => e.ids.forEach(id => { overlapCountOf[id] = (overlapCountOf[id] || 0) + 1; }));
+
+  // recommendReason은 REMOVE일 때 "제품 N번과 X개 성분 중복" 줄들 + 마지막 요약 줄
+  const removeList = [], keepList = [];
+  llmProduct.forEach(p => {
+    const lines = relabel(p.recommendReason).split('\n').map(s => s.trim()).filter(Boolean);
+    const name  = esc(nameOf[p.productId] || '');
+    if(String(p.recommended).toUpperCase() === 'REMOVE'){
+      removeList.push({
+        name,
+        reason: esc(lines.length > 1 ? lines.slice(0,-1).join(' · ') : (lines[0] || '')),
+        why   : esc(lines.length > 1 ? lines[lines.length-1] : ''),
+        overlapCount: overlapCountOf[p.productId] || 0
+      });
+    }else{
+      keepList.push({name, note: esc(lines.join(' '))});
+    }
+  });
+
+  return {
+    removeList,
+    keepList,
+    overlaps,
+    unmatched: [],            // 서버가 매칭 실패한 성분은 버려서 내려주지 않음
+    partial  : !!raw.partial
+  };
+}
+
+/* ══════════════════════════════════════════════════════
+   퍼널 추적
+   ══════════════════════════════════════════════════════ */
+const store = (()=>{ // 아티팩트 미리보기에서도 안 깨지게
+  try{ localStorage.setItem('_t','1'); localStorage.removeItem('_t'); return localStorage; }
+  catch(e){ const m={}; return {getItem:k=>m[k]??null, setItem:(k,v)=>m[k]=v}; }
+})();
+
+const VISITOR = (()=>{
+  let v = store.getItem('sott_vid');
+  if(!v){ v = 'v_' + Math.random().toString(36).slice(2) + Date.now().toString(36); store.setItem('sott_vid', v); }
+  return v;
+})();
+
+const UTM = (()=>{
+  const p = new URLSearchParams(location.search), o = {};
+  ['utm_source','utm_medium','utm_campaign','utm_content','utm_term'].forEach(k=>{ if(p.get(k)) o[k]=p.get(k); });
+  const saved = store.getItem('sott_utm');
+  if(Object.keys(o).length){ store.setItem('sott_utm', JSON.stringify(o)); return o; }
+  return saved ? JSON.parse(saved) : {};
+})();
+
+if(CONFIG.META_PIXEL_ID){
+  !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+  n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+  n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+  t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}
+  (window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+  fbq('init', CONFIG.META_PIXEL_ID); fbq('track','PageView');
+}
+
+function track(name, data={}){
+  const payload = {event:name, visitor:VISITOR, ts:Date.now(), ...UTM, ...data};
+  console.log('[track]', payload);
+  if(window.fbq) fbq('trackCustom', name, payload);
+  if(!CONFIG.MOCK){
+    try{
+      navigator.sendBeacon(CONFIG.API + '/events', new Blob([JSON.stringify(payload)], {type:'application/json'}));
+    }catch(e){}
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   화면 전환
+   ══════════════════════════════════════════════════════ */
+const $ = s => document.querySelector(s);
+const steps = ['landing','guide','list','loading','result','error'];
+function show(name){
+  steps.forEach(s => $('#s-'+s).classList.toggle('on', s===name));
+  window.scrollTo(0,0);
+}
+
+/* ══════════════════════════════════════════════════════
+   랜딩 시그니처 — 겹치는 성분이 드러나는 전성분표
+   ══════════════════════════════════════════════════════ */
+(function demoLabel(){
+  const list = ['정제수','글리세린','나이아신아마이드','부틸렌글라이콜','다이프로필렌글라이콜',
+    '판테놀','1,2-헥산다이올','베타인','알란토인','히알루론산','토코페롤','리모넨','리날룰',
+    '시트로넬올','정제수','나이아신아마이드','리모넨','스쿠알란','세라마이드엔피','판테놀'];
+  const dup = new Set(['나이아신아마이드','리모넨','정제수','판테놀']);
+  $('#demo-label').innerHTML = list
+    .map(n => dup.has(n) ? `<span class="hl">${n}</span>` : n).join(', ');
+  let i=0;
+  const foot = $('#demo-foot');
+  const msg = '제품 3개에서 같은 성분 4개가 겹칩니다';
+  const t = setInterval(()=>{ foot.textContent = msg.slice(0,++i); if(i>=msg.length) clearInterval(t); }, 40);
+})();
+
+/* ══════════════════════════════════════════════════════
+   이미지 — EXIF 회전 보정 + 리사이즈
+   ══════════════════════════════════════════════════════ */
+async function prepare(file){
+  let bmp;
+  try{
+    bmp = await createImageBitmap(file, {imageOrientation:'from-image'});
+  }catch(e){
+    bmp = await new Promise((res,rej)=>{
+      const img = new Image();
+      img.onload = ()=>res(img); img.onerror = rej;
+      img.src = URL.createObjectURL(file);
+    });
+  }
+  const w = bmp.width, h = bmp.height;
+  const scale = Math.min(1, CONFIG.MAX_LONG_EDGE / Math.max(w,h));
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(w*scale); cv.height = Math.round(h*scale);
+  cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+  const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', CONFIG.JPEG_QUALITY));
+  return {blob, preview: cv.toDataURL('image/jpeg', 0.5)};
+}
+
+/* ══════════════════════════════════════════════════════
+   API
+   ══════════════════════════════════════════════════════ */
+/* 서버는 품질 경고를 내려주지 않는다. BLUR는 업로드 실패 시 폴백,
+   FEW_INGREDIENTS는 읽힌 성분 수로 프론트에서 판단한다. */
+const WARN_TEXT = {
+  UPLOADING:'읽는 중…',
+  BLUR:'글자가 흐려요. 다시 찍어주세요',
+  TOO_DARK:'너무 어두워요. 밝은 곳에서 다시',
+  FEW_INGREDIENTS:'성분이 몇 개 안 읽혔어요. 성분면을 꽉 채워서'
+};
+
+/* GlobalResponse({success, code, message, data}) 언랩 + 타임아웃 */
+async function api(path, opts){
+  const ctrl  = new AbortController();
+  const timer = setTimeout(()=>ctrl.abort(), CONFIG.POLL_MS * CONFIG.POLL_MAX);
+  let res;
+  try{
+    res = await fetch(CONFIG.API + path, {...opts, signal: ctrl.signal});
+  }catch(e){
+    throw new Error(ctrl.signal.aborted ? 'timeout' : 'network_failed');
+  }finally{
+    clearTimeout(timer);
+  }
+  let body = null;
+  try{ body = await res.json(); }catch(e){}
+  if(!res.ok || !body || body.success === false){
+    throw new Error(res.status === 408 || res.status === 504 ? 'timeout' : 'request_failed');
+  }
+  return body.data;
+}
+
+/* POST /analyses/ocr — multipart 파트명은 file (Content-Type은 fetch가 붙인다) */
+async function uploadProduct(blob){
+  if(CONFIG.MOCK){
+    await new Promise(r=>setTimeout(r,900));
+    const bad = Math.random() < 0.25;
+    return {
+      productId:'p_'+Math.random().toString(36).slice(2),
+      recognizedCount: bad ? 4 : 24 + Math.floor(Math.random()*14),
+      qualityWarning: bad ? 'BLUR' : null,
+      ingredients: []
+    };
+  }
+  const fd = new FormData();
+  fd.append('file', blob, 'label.jpg');
+  const data = await api('/analyses/ocr', {method:'POST', body:fd});
+  const ingredients = data.ingredients || [];   // [{ingredientId, name, isToxic, riskLevel}]
+  return {
+    productId      : data.productId,
+    recognizedCount: ingredients.length,
+    qualityWarning : ingredients.length < CONFIG.MIN_INGREDIENTS ? 'FEW_INGREDIENTS' : null,
+    ingredients,
+    imageUrl       : data.imageUrl,
+    category       : data.category
+  };
+}
+
+/* 서버 분석은 동기 응답이라 폴링할 job이 없다.
+   요청 자체를 job으로 들고 있다가 pollAnalysis에서 결과를 꺼낸다. */
+const JOBS = new Map();
+
+async function startAnalysis(ids){
+  if(CONFIG.MOCK){ await new Promise(r=>setTimeout(r,600)); return {jobId:'job_mock'}; }
+
+  // 제외/유지 제안 (LLM) — 실패할 수 있는 쪽
+  const analysisReq = api('/analyses', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      products: ids.map(id => ({productId:id, userRoutineSlot: CONFIG.ROUTINE_SLOT}))
+    })
+  });
+  // 성분·알레르기 매칭 — LLM과 무관하게 도는 쪽 (PARTIAL의 근거)
+  // GET + 쿼리파라미터. 커스텀 헤더가 없어 preflight도 안 탄다
+  const matchReq = api('/ingredients?productIds=' + ids.join(','));
+
+  // 겹침 판정에 쓸 제품별 성분은 업로드 응답에 이미 있으니 여기서 스냅샷
+  const snapshot = ids.map(id => {
+    const idx = items.findIndex(i => i.productId === id);
+    const it  = items[idx] || {};
+    return {productId: id, label: `제품 ${idx+1}`, ingredients: it.ingredients || []};
+  });
+
+  const jobId = 'job_' + Date.now().toString(36);
+  JOBS.set(jobId, {req: Promise.allSettled([analysisReq, matchReq]), snapshot});
+  return {jobId};
+}
+
+async function pollAnalysis(jobId){
+  if(CONFIG.MOCK){
+    await new Promise(r=>setTimeout(r,1600));
+    return normalizeResult(MOCK_RESULT);
+  }
+  const job = JOBS.get(jobId);
+  if(!job) throw new Error('analysis_failed');
+  JOBS.delete(jobId);
+
+  const [a, m] = await job.req;
+  const analysis = a.status === 'fulfilled' ? a.value : null;
+  const match    = m.status === 'fulfilled' ? m.value : null;
+
+  // 둘 다 실패 = 보여줄 게 없음 -> 오류 화면
+  if(!analysis && !match){
+    const reason = (a.reason && a.reason.message) || (m.reason && m.reason.message);
+    throw new Error(reason === 'timeout' ? 'timeout' : 'analysis_failed');
+  }
+
+  // 제안(LLM)만 실패 -> PARTIAL. 겹치는 성분은 그대로 보여준다
+  return normalizeResult({
+    analysis,
+    match,
+    products: job.snapshot,
+    partial : !analysis
+  });
+}
+
+const MOCK_RESULT = {
+  removeList:[
+    {name:'제품 2', reason:'제품 1과 성분 9개 겹침', why:'제품 1이 같은 역할을 하고 성분 수가 적어요', overlapCount:9},
+    {name:'제품 4', reason:'제품 1과 성분 7개 겹침', why:'같은 보습 성분이 이미 세 제품에 들어 있어요', overlapCount:7}
+  ],
+  keepList:[{name:'제품 1', note:'겹치는 성분 없음'},{name:'제품 3', note:'겹치는 성분 없음'}],
+  overlaps:[
+    {name:'리모넨', products:['제품 1','제품 2','제품 3','제품 4'], layer:'REGULATION',
+     source:'식약처 · 알레르기 유발성분 25종',
+     note:'전성분에 적혀 있다는 건 표시 기준 이상 들어 있다는 뜻이에요'},
+    {name:'나이아신아마이드', products:['제품 1','제품 2','제품 4'], layer:'CALCULATION', source:''},
+    {name:'판테놀', products:['제품 2','제품 3'], layer:'CALCULATION', source:''}
+  ],
+  unmatched:['알로에베라잎추출물','다이소듐이디티에이','향료']
+};
+
+/* ══════════════════════════════════════════════════════
+   상태 + 렌더
+   ══════════════════════════════════════════════════════ */
+let items = [];   // {productId, recognizedCount, qualityWarning, preview}
+
+function renderList(){
+  const ok = items.filter(i=>!i.qualityWarning).length;
+  $('#list-title').textContent = `${items.length}개 찍었어요`;
+  $('#list-sub').textContent = ok >= CONFIG.MIN_PRODUCTS
+    ? '이제 분석할 수 있어요'
+    : `${CONFIG.MIN_PRODUCTS}개 이상이면 분석할 수 있어요`;
+
+  $('#rows').innerHTML = items.map((it,idx)=>`
+    <div class="row">
+      <img class="thumb" src="${it.preview}" alt="">
+      <div class="meta">
+        <div class="nm">제품 ${idx+1}</div>
+        <div class="sub ${it.qualityWarning?'warn':''}">
+          ${it.qualityWarning ? WARN_TEXT[it.qualityWarning] : `성분 ${it.recognizedCount}개 읽었어요`}
+        </div>
+      </div>
+      <button class="del" data-i="${idx}" aria-label="제품 ${idx+1} 삭제">&times;</button>
+    </div>`).join('');
+
+  $('#rows').querySelectorAll('.del').forEach(b=>{
+    b.onclick = ()=>{ items.splice(+b.dataset.i,1); renderList(); track('photo_removed',{count:items.length}); };
+  });
+  $('#start-analysis').disabled = ok < CONFIG.MIN_PRODUCTS;
+}
+
+function badge(layer){
+  if(layer==='REGULATION') return '<span class="badge b-reg">규제</span>';
+  if(layer==='REFERENCE')  return '<span class="badge b-ref">참고</span>';
+  return '<span class="badge b-calc">계산</span>';
+}
+
+function renderResult(r){
+  const totalOverlap = r.overlaps.length;
+  $('#r-head').textContent = r.removeList.length
+    ? `${r.removeList.length}개는 빼도 돼요`
+    : '겹치는 성분이 거의 없어요';
+  $('#r-sub').textContent = `제품 ${items.length}개 · 겹치는 성분 ${totalOverlap}개`;
+
+  $('#r-remove').innerHTML = r.partial
+    ? `<p class="small">지금은 제외 제안을 만들지 못했어요. 겹치는 성분은 아래에서 확인하실 수 있어요.</p>`
+    : r.removeList.map(x=>`
+      <div class="card">
+        <div class="t">${x.name} · 빼기 ${badge('CALCULATION')}</div>
+        <div class="d">${x.reason}</div>
+        ${x.why ? `<div class="why">${x.why}</div>` : ''}
+      </div>`).join('');
+
+  $('#r-keep').innerHTML = r.keepList.length ? `
+    <div class="rule"></div>
+    <h2 style="font-size:16px">이건 계속 쓰세요</h2>
+    ${r.keepList.map(k=>`
+      <div class="row"><div class="meta"><div class="nm">${k.name}</div>
+      <div class="sub">${k.note||''}</div></div></div>`).join('')}` : '';
+
+  $('#r-overlap').innerHTML = r.overlaps.length ? `
+    <div class="rule"></div>
+    <details class="ov">
+    <summary>여러 제품에서 겹치는 성분 ${r.overlaps.length}개</summary>
+    ${r.overlaps.map(o=>`
+      <div class="card ${o.layer==='REGULATION'?'warn':''}">
+        <div class="t">${o.name} ${badge(o.layer)}</div>
+        <div class="d">${o.products.join(' · ')}</div>
+        ${o.note ? `<div class="why">${o.note}</div>` : ''}
+        ${o.source ? `<div class="small" style="margin-top:6px">${o.source}</div>` : ''}
+      </div>`).join('')}
+    <p class="small">알레르기가 없다면 문제되지 않아요. 다만 겹치는 만큼 노출은 늘어납니다.</p>
+    </details>` : '';
+
+  $('#r-unmatched').textContent = r.unmatched.length
+    ? `못 알아본 성분 ${r.unmatched.length}개 · 사진이 흐리면 놓칠 수 있어요` : '';
+}
+
+/* ══════════════════════════════════════════════════════
+   흐름
+   ══════════════════════════════════════════════════════ */
+track('view_landing');
+
+$('#go-capture').onclick = ()=>{ track('start_capture'); show('guide'); };
+$('#back-landing').onclick = ()=> show('landing');
+$('#open-cam').onclick   = ()=> $('#cam').click();
+$('#add-more').onclick   = ()=> $('#cam').click();
+
+$('#cam').onchange = async e=>{
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+
+  show('list');
+  const idx = items.length;
+  items.push({productId:null, recognizedCount:0, qualityWarning:'UPLOADING', preview:''});
+  renderList();
+
+  try{
+    const {blob, preview} = await prepare(file);
+    items[idx].preview = preview;
+    renderList();
+    const res = await uploadProduct(blob);
+    items[idx] = {...res, preview};
+    track('photo_added', {index:idx+1, recognized:res.recognizedCount, warning:res.qualityWarning||'none'});
+    if(res.qualityWarning) track('photo_quality_warning', {reason:res.qualityWarning});
+  }catch(err){
+    items[idx].qualityWarning = 'BLUR';
+    track('photo_upload_failed');
+  }
+  renderList();
+};
+
+$('#start-analysis').onclick = async ()=>{
+  const ids = items.filter(i=>!i.qualityWarning && i.productId).map(i=>i.productId);
+  track('analysis_start', {products: ids.length});
+  show('loading');
+  try{
+    const {jobId} = await startAnalysis(ids);
+    const result  = await pollAnalysis(jobId);
+    renderResult(result);
+    track('analysis_done', {
+      products: ids.length,
+      overlaps: result.overlaps.length,
+      removed: result.removeList.length,
+      partial: !!result.partial
+    });
+    show('result');
+    track('result_view');
+  }catch(err){
+    $('#err-msg').textContent = err.message === 'timeout'
+      ? '시간이 오래 걸리고 있어요. 잠시 후 다시 시도해주세요.'
+      : '사진을 다시 찍으면 해결되는 경우가 많아요.';
+    track('analysis_failed', {reason: err.message});
+    show('error');
+  }
+};
+
+document.querySelectorAll('[data-w]').forEach(b=>{
+  b.onclick = ()=>{
+    track('willingness_' + b.dataset.w);
+    $('#ask').querySelector('.opts').classList.add('hidden');
+    $('#thx').style.display = 'block';
+  };
+});
+
+$('#retry').onclick = ()=> show('list');
+$('#again').onclick = ()=>{ items = []; renderList(); track('restart'); show('landing'); };
+</script>
+</body>
+</html>

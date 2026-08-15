@@ -3,6 +3,7 @@ package com.nyyb.nyybserver.common.security;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -21,6 +22,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
+                // CorsConfig 의 CorsConfigurationSource 빈을 사용.
+                // 시큐리티 체인 앞단에서 preflight(OPTIONS)를 통과시키려면 여기 등록이 필요하다.
+                .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -28,8 +32,13 @@ public class SecurityConfig {
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
+                                // 검증 페이지(단일 HTML)를 같은 오리진에서 서빙한다
+                                "/",
+                                "/index.html",
+                                "/favicon.ico",
                                 "/auth/**",
                                 "/analyses/**",
+                                "/events",
                                 "/routines/**",
                                 "/ingredients/**",
                                 "/swagger-ui/**",
