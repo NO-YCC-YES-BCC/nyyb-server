@@ -85,10 +85,9 @@ public class OcrService {
         // 4. DB 저장 — 트랜잭션 경계 (별도 빈)
         AnalysisWriter.Result saved = analysisWriter.save(imageKey, category, ocrText);
 
-        // 5. 응답 조립 — 방금 저장한 값 + 즉시 사용할 presigned URL (추가 조회 없음)
+        // 5. 응답 조립 — 방금 저장한 값 (추가 조회 없음)
         return OcrResponseDto.builder()
                 .productId(saved.productId())
-                .imageUrl(fileService.getPresignedUrl(imageKey))
                 .category(category)
                 .ingredients(saved.ingredients())
                 .build();

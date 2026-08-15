@@ -8,14 +8,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
-import software.amazon.awssdk.services.s3.presigner.S3Presigner;
-import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.UUID;
 
 @Slf4j
@@ -23,10 +19,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FileService {
 
-    private static final Duration PRESIGNED_URL_EXPIRATION = Duration.ofMinutes(30);
-
     private final S3Client s3Client;
-    private final S3Presigner s3Presigner;
 
     @Value("${cloud.aws.s3.bucket}")
     private String bucketName;
@@ -49,22 +42,5 @@ public class FileService {
             throw new ImageUploadException();
         }
         return key;
-    }
-
-    /**
-     * 저장된 key로 조회 시점에 presigned GET URL을 발급한다. (DB에 저장하지 않고 매번 발급)
-     */
-    public String getPresignedUrl(String key) {
-        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
-                .bucket(bucketName)
-                .key(key)
-                .build();
-
-        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
-                .signatureDuration(PRESIGNED_URL_EXPIRATION)
-                .getObjectRequest(getObjectRequest)
-                .build();
-
-        return s3Presigner.presignGetObject(presignRequest).url().toString();
     }
 }

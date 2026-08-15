@@ -26,7 +26,7 @@ public class Analysis {
     @JdbcTypeCode(SqlTypes.CHAR)
     private UUID id; // = jobId
 
-    // nullable: 게스트는 null, claim 시 채움
+    // 소유자(게스트/카카오 공통). 생성 시 현재 로그인 유저로 지정, 게스트→소셜 병합 시 재지정
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;

@@ -1,11 +1,12 @@
 package com.nyyb.nyybserver.analysis.controller;
 
 import com.nyyb.nyybserver.analysis.data.dto.request.AnalysisRequestDto;
-import com.nyyb.nyybserver.analysis.data.dto.response.LlmAnalysisResponseDto;
+import com.nyyb.nyybserver.analysis.data.dto.response.AnalysisResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.OcrResponseDto;
 import com.nyyb.nyybserver.analysis.service.AnalysisService;
 import com.nyyb.nyybserver.analysis.service.OcrService;
 import com.nyyb.nyybserver.common.response.GlobalResponse;
+import com.nyyb.nyybserver.common.security.SecurityUtil;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -26,8 +27,8 @@ public class AnalysisController {
         return GlobalResponse.ok(ocrService.ocr(file));
     }
 
-    @PostMapping(value = "/{productids}")
-    public GlobalResponse<LlmAnalysisResponseDto> analyze(@RequestBody AnalysisRequestDto request) {
-        return GlobalResponse.ok(analysisService.analyze(request));
+    @PostMapping
+    public GlobalResponse<AnalysisResponseDto> analyze(@RequestBody AnalysisRequestDto request) {
+        return GlobalResponse.ok(analysisService.analyze(request, SecurityUtil.getUserId()));
     }
 }
