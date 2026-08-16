@@ -2,9 +2,15 @@ spring:
   application:
     name: nyyb-server        # 앱 이름
 
+  config:
+    import: optional:file:.env[.properties] # 로컬 비밀값은 프로젝트 루트 .env에서 로드
+
   profiles:
     active: local            # 기본 프로파일
-
+  data:
+    redis:
+      host: localhost
+      port: 6379
   jpa:
     hibernate:
       ddl-auto: validate     # 스키마 검증만 (운영)
@@ -12,5 +18,14 @@ spring:
       hibernate:
         format_sql: true     # SQL 포맷 정렬
     open-in-view: false      # OSIV 비활성화
+
+  servlet:
+    multipart:
+      max-file-size: 10MB    # 업로드 이미지 최대 크기
+      max-request-size: 10MB
+
+# CLOVA OCR 값(api-url, secret-key)은 프로파일별 파일에서 주입
+
+# AWS S3 값(bucket, static, access-key, secret-key)은 프로파일별 파일에서 주입
 
 # 데이터소스는 프로파일별 파일 또는 환경변수로 주입
