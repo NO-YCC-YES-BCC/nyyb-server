@@ -29,7 +29,7 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class AuthService {
+public class KakaoService {
     private final UserRepository userRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final List<GuestDataOwnershipTransfer> guestDataOwnershipTransfers;
