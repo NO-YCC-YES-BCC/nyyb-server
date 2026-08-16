@@ -31,6 +31,9 @@ public class Analysis {
     @JoinColumn(name = "user_id")
     private User user;
 
+    @Column
+    private String title; // 목록 표시용 문구 (예: "8월 3일 5개의 제품")
+
     @CreatedDate
     @Column(updatable = false)
     private LocalDateTime createdAt;
@@ -38,4 +41,9 @@ public class Analysis {
     @LastModifiedDate
     @Column
     private LocalDateTime updatedAt;
+
+    // 삭제 요청 시 소유자만 해제한다(데이터는 남기고 유저 목록/상세에서만 사라짐)
+    public void releaseOwner() {
+        this.user = null;
+    }
 }

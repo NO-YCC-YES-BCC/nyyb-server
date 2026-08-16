@@ -1,15 +1,20 @@
 package com.nyyb.nyybserver.routine.controller;
 
 import com.nyyb.nyybserver.analysis.data.enums.RoutineSlot;
+import com.nyyb.nyybserver.common.dto.PageRequestDto;
 import com.nyyb.nyybserver.common.response.GlobalResponse;
-import com.nyyb.nyybserver.routine.data.dto.request.SaveRoutineRequestDto;
-import com.nyyb.nyybserver.routine.data.dto.response.CreateRoutineResponseDto;
+import com.nyyb.nyybserver.common.security.SecurityUtil;
+import com.nyyb.nyybserver.routine.data.dto.request.RoutineSaveRequestDto;
+import com.nyyb.nyybserver.routine.data.dto.response.RoutineDesignResponseDto;
 import com.nyyb.nyybserver.routine.data.dto.response.RoutineDayResponseDto;
+import com.nyyb.nyybserver.routine.data.dto.response.RoutineSummaryDto;
 import com.nyyb.nyybserver.routine.service.RoutineService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 
@@ -21,21 +26,45 @@ public class RoutineController {
 
     private final RoutineService routineService;
 
+    @GetMapping
+    public GlobalResponse<List<RoutineSummaryDto>> getRoutines(@ParameterObject PageRequestDto pageRequest) {
+        return GlobalResponse.ok(routineService.getRoutines(SecurityUtil.getUserId(), pageRequest.toPageable()));
+    }
+
+    // 현재 로그인 유저의 가장 최신 루틴 상세 조회.
+    @GetMapping("/latest")
+    public GlobalResponse<RoutineDesignResponseDto> getLatestRoutine() {
+        return GlobalResponse.ok(routineService.getLatestRoutine(SecurityUtil.getUserId()));
+    }
+
+    // 루틴 상세 조회 (designRoutine 응답과 동일한 형식)
+    @GetMapping("/{routineId}")
+    public GlobalResponse<RoutineDesignResponseDto> getRoutine(@PathVariable UUID routineId) {
+        return GlobalResponse.ok(routineService.getRoutine(routineId, SecurityUtil.getUserId()));
+    }
+
+    // 루틴 삭제 (소유자만 해제하는 소프트 삭제)
+    @DeleteMapping("/{routineId}")
+    public GlobalResponse<Void> deleteRoutine(@PathVariable UUID routineId) {
+        routineService.deleteRoutine(routineId, SecurityUtil.getUserId());
+        return GlobalResponse.ok();
+    }
+
     @PostMapping("/{routineId}/design")
-    public GlobalResponse<CreateRoutineResponseDto> designRoutine(@PathVariable UUID routineId) {
-        return GlobalResponse.ok(routineService.createRoutine(routineId));
+    public GlobalResponse<RoutineDesignResponseDto> designRoutine(@PathVariable UUID routineId) {
+        return GlobalResponse.ok(routineService.designRoutine(routineId, SecurityUtil.getUserId()));
     }
 
     @GetMapping("/{routineId}/day")
     public GlobalResponse<RoutineDayResponseDto> getRoutineDay(@PathVariable UUID routineId,
                                                                @RequestParam String slot) {
-        return GlobalResponse.ok(routineService.getRoutineDay(routineId, parseSlot(slot)));
+        return GlobalResponse.ok(routineService.getRoutineDay(routineId, SecurityUtil.getUserId(), parseSlot(slot)));
     }
 
     @PatchMapping("/{routineId}/products")
     public GlobalResponse<UUID> saveRoutine(@PathVariable UUID routineId,
-                                            @RequestBody SaveRoutineRequestDto request) {
-        return GlobalResponse.ok(routineService.saveRoutine(routineId, request));
+                                            @RequestBody RoutineSaveRequestDto request) {
+        return GlobalResponse.ok(routineService.saveRoutine(routineId, SecurityUtil.getUserId(), request));
     }
 
     // "morning"/"MORNING", "evening"/"EVENING" 등 대소문자 상관없이 파싱

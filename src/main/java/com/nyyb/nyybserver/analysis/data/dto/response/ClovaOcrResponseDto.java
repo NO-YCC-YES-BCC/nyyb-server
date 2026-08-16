@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record OcrApiResponseDto(
+public record ClovaOcrResponseDto(
         List<Image> images
 ) {
 

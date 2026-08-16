@@ -11,5 +11,6 @@ import java.util.List;
 public class OcrResponseDto {
     private Long productId;
     private ProductCategory category;
-    private List<IngredientSummaryDto> ingredients;
+    private int ingredientCount; // 매칭된 성분 갯수
+    private List<OcrIngredientDto> ingredients;
 }

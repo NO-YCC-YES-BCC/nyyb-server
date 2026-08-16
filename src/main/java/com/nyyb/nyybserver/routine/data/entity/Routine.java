@@ -37,6 +37,9 @@ public class Routine {
     private Analysis analysis;
 
     @Column
+    private String title; // 목록 표시용 문구 (예: "8월 3일 5개의 제품")
+
+    @Column
     private Integer score; // 100분위 점수 (예: 66)
 
     @Column(columnDefinition = "TEXT")
@@ -49,21 +52,26 @@ public class Routine {
     private Integer beforeCount; // 분석 전 제품 개수
 
     @Column
-    private Integer afterCount; // 유저가 제거 선택한 개수
+    private Integer afterCount; // 유저가 유지 선택한 개수
 
     @CreatedDate
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
-    // createRoutine 단계에서 LLM 루틴 설계 결과를 반영
+    // designRoutine 단계에서 LLM 루틴 설계 결과를 반영
     public void applyLlmRoutine(Integer score, String scoreReason, String summary) {
         this.score = score;
         this.scoreReason = scoreReason;
         this.summary = summary;
     }
 
-    // saveRoutine 단계에서 유저가 제거 선택한 개수를 반영
+    // saveRoutine 단계에서 유저가 유지 선택한 개수를 반영
     public void applyAfterCount(Integer afterCount) {
         this.afterCount = afterCount;
+    }
+
+    // 삭제 요청 시 소유자만 해제한다(데이터는 남기고 유저 목록/상세에서만 사라짐)
+    public void releaseOwner() {
+        this.user = null;
     }
 }

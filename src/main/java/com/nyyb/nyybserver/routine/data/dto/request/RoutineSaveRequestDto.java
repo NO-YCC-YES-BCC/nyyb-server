@@ -7,7 +7,7 @@ import lombok.Data;
 import java.util.List;
 
 @Data
-public class SaveRoutineRequestDto {
+public class RoutineSaveRequestDto {
 
     // 제품별 유저 선택 (슬롯 + 유지/제외)
     private List<ProductSelection> products;

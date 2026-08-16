@@ -3,7 +3,7 @@ package com.nyyb.nyybserver.analysis.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.nyyb.nyybserver.analysis.data.dto.response.OcrApiResponseDto;
+import com.nyyb.nyybserver.analysis.data.dto.response.ClovaOcrResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.OcrResponseDto;
 import com.nyyb.nyybserver.analysis.data.enums.ProductCategory;
 import com.nyyb.nyybserver.analysis.data.exception.InvalidImageException;
@@ -44,7 +44,7 @@ public class OcrService {
     private final RestClient clovaOcrRestClient;
     private final ObjectMapper objectMapper;
     private final FileService fileService;
-    private final AnalysisWriter analysisWriter;
+    private final ProductWriter productWriter;
 
     @Value("${clova-ocr.secret-key}")
     private String secretKey;
@@ -53,23 +53,24 @@ public class OcrService {
     /**
      * 사진 -> ocr -> 카테고리 분류, 성분 매칭
      * @param image
+     * @param userId 저장할 Product의 소유자(현재 로그인 유저)
      * @return OcrResponseDto
      */
-    public OcrResponseDto ocr(MultipartFile image) {
+    public OcrResponseDto ocr(MultipartFile image, Long userId) {
         if (image == null || image.isEmpty()) {
             throw new InvalidImageException();
         }
 
         // 1. 외부 I/O — CLOVA OCR 호출 (multipart/form-data: message, file)
         MultiValueMap<String, Object> body = buildMultipartBody(image);
-        OcrApiResponseDto ocrResult;
+        ClovaOcrResponseDto clovaOcrResponse;
         try {
-            ocrResult = clovaOcrRestClient.post()
+            clovaOcrResponse = clovaOcrRestClient.post()
                     .header("X-OCR-SECRET", secretKey)
                     .contentType(MediaType.MULTIPART_FORM_DATA)
                     .body(body)
                     .retrieve()
-                    .body(OcrApiResponseDto.class);
+                    .body(ClovaOcrResponseDto.class);
         } catch (RestClientException e) {
             log.error("CLOVA OCR API 호출 중 오류가 발생했습니다.", e);
             throw new OcrApiException();
@@ -79,16 +80,17 @@ public class OcrService {
         String imageKey = fileService.upload(image, "analysis");
 
         // 3. 가공 — OCR 필드 join + 카테고리 분류
-        String ocrText = buildOcrText(ocrResult);
+        String ocrText = buildOcrText(clovaOcrResponse);
         ProductCategory category = ProductCategory.classify(ocrText);
 
         // 4. DB 저장 — 트랜잭션 경계 (별도 빈)
-        AnalysisWriter.Result saved = analysisWriter.save(imageKey, category, ocrText);
+        ProductWriter.Result saved = productWriter.save(userId, imageKey, category, ocrText);
 
         // 5. 응답 조립 — 방금 저장한 값 (추가 조회 없음)
         return OcrResponseDto.builder()
                 .productId(saved.productId())
                 .category(category)
+                .ingredientCount(saved.ingredientCount())
                 .ingredients(saved.ingredients())
                 .build();
     }
@@ -157,7 +159,7 @@ public class OcrService {
     }
 
     // OCR 결과 -> text로 전환
-    private String buildOcrText(OcrApiResponseDto result) {
+    private String buildOcrText(ClovaOcrResponseDto result) {
         if (result == null || result.images() == null) {
             log.warn("OCR 응답이 비어 있습니다. result={}", result);
             throw new OcrApiException();
