@@ -137,7 +137,7 @@ p{margin:0 0 12px;color:var(--ink-60)}
 <!-- 2 · 촬영 안내 -->
 <section id="s-guide" class="step">
   <h2>성분이 적힌 면을 찍어주세요</h2>
-  <p>3개 이상이면 겹치는 성분을 찾을 수 있어요.</p>
+  <p>2개 이상이면 겹치는 성분을 찾을 수 있어요.</p>
   <div class="label-card">
     <div class="label-body" style="font-size:13px;line-height:2">
       성분 적힌 면이 화면을 채우게<br>
@@ -156,7 +156,7 @@ p{margin:0 0 12px;color:var(--ink-60)}
 <!-- 3 · 제품 목록 -->
 <section id="s-list" class="step">
   <h2 id="list-title">1개 찍었어요</h2>
-  <p class="small" id="list-sub">3개 이상이면 분석할 수 있어요</p>
+  <p class="small" id="list-sub">2개 이상이면 분석할 수 있어요</p>
   <div id="rows"></div>
   <button class="btn ghost" id="add-more" style="margin-top:14px">제품 더 찍기</button>
   <button class="btn ghost" id="add-more-pick">사진첩에서 추가</button>
@@ -208,7 +208,7 @@ const CONFIG = {
   MOCK: false,                     // true = 서버 없이 프론트만 테스트 (목업 그대로 남겨둠)
   API: '',                         // 같은 오리진에서 서빙하므로 상대경로 (별도 도메인 쓰면 여기에 주소)
   META_PIXEL_ID: '',               // 픽셀 ID (없으면 빈칸)
-  MIN_PRODUCTS: 3,
+  MIN_PRODUCTS: 2,               // 3개 요구가 이탈 장벽이라 2개로 낮춤
   MAX_LONG_EDGE: 2200,             // 리사이즈 긴 변 px
   JPEG_QUALITY: 0.85,
   POLL_MS: 2000,
