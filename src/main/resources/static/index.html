@@ -88,6 +88,22 @@ p{margin:0 0 12px;color:var(--ink-60)}
 .card .d{font-size:13px;color:var(--ink-60);margin-top:7px;line-height:1.65}
 .card .why{font-size:13px;color:var(--ink-60);margin-top:9px;padding-top:9px;border-top:1px solid var(--rule)}
 
+/* 촬영 예시 — 실제 제품 사진 대신 가상 라벨로 그린다 */
+.ex{display:flex;gap:10px;margin:18px 0 14px}
+.ex-col{flex:1;min-width:0}
+.ex-tag{font-size:12px;font-weight:600;margin-bottom:6px}
+.ex-tag.ok{color:var(--mark)}
+.ex-tag.no{color:var(--ink-30)}
+.ex-box{
+  border:1px solid var(--rule);border-radius:8px;background:#fff;
+  padding:10px;height:132px;overflow:hidden;position:relative;
+}
+.ex-box.dim{background:#F6F6F4}
+.ex-box.dim .ex-t{color:var(--ink-30)}
+.ex-h{font-size:9px;letter-spacing:.12em;color:var(--ink-30);margin-bottom:6px}
+.ex-t{font-size:10.5px;line-height:1.7;color:var(--ink-60);word-break:keep-all}
+.ex-box:not(.dim){outline:2px solid var(--mark);outline-offset:-1px}
+
 /* 겹치는 성분 — 길어서 접었다 폈다 */
 .ov>summary{
   font-size:16px;font-weight:600;letter-spacing:-0.02em;
@@ -136,15 +152,28 @@ p{margin:0 0 12px;color:var(--ink-60)}
 
 <!-- 2 · 촬영 안내 -->
 <section id="s-guide" class="step">
-  <h2>성분이 적힌 면을 찍어주세요</h2>
-  <p>2개 이상이면 겹치는 성분을 찾을 수 있어요.</p>
-  <div class="label-card">
-    <div class="label-body" style="font-size:13px;line-height:2">
-      성분 적힌 면이 화면을 채우게<br>
-      그림자가 지지 않게<br>
-      둥근 면은 최대한 펴서
+  <h2>뒷면 <span class="hl">전성분</span> 부분을 찍어주세요</h2>
+  <p>앞면·제품명이 아니라, 성분이 쭉 나열된 면이 필요해요. 2개 이상이면 겹치는 성분을 찾을 수 있어요.</p>
+
+  <!-- 무엇을 찍어야 하는지 보여주는 예시 (실제 제품 사진이 아닌 가상의 라벨) -->
+  <div class="ex">
+    <div class="ex-col">
+      <div class="ex-tag ok">이렇게</div>
+      <div class="ex-box">
+        <div class="ex-h">전성분</div>
+        <div class="ex-t">정제수, 글리세린, 나이아신아마이드, 부틸렌글라이콜, 1,2-헥산다이올, 판테놀, 알란토인, 베타인, 토코페롤…</div>
+      </div>
+    </div>
+    <div class="ex-col">
+      <div class="ex-tag no">이건 안 돼요</div>
+      <div class="ex-box dim">
+        <div class="ex-h">앞면 · 사용법</div>
+        <div class="ex-t">○○ 수분 진정 토너<br>사용법: 적당량을 덜어 피부에<br>골고루 펴 발라주세요<br>용량 200ml</div>
+      </div>
     </div>
   </div>
+
+  <p class="small">뒷면 글씨가 너무 작거나 안 보이면, <b>인터넷에서 제품명 + 전성분</b>을 검색해 성분 목록 화면을 캡처해서 올려도 됩니다.</p>
   <input type="file" id="cam" accept="image/*" capture="environment" class="hidden">
   <!-- capture 속성이 없어야 카메라 대신 사진첩이 열린다 -->
   <input type="file" id="pick" accept="image/*" multiple class="hidden">
@@ -443,9 +472,10 @@ async function prepare(file){
    FEW_INGREDIENTS는 읽힌 성분 수로 프론트에서 판단한다. */
 const WARN_TEXT = {
   UPLOADING:'읽는 중…',
-  BLUR:'글자가 흐려요. 다시 찍어주세요',
+  BLUR:'사진을 못 보냈어요. 다시 시도해주세요',
   TOO_DARK:'너무 어두워요. 밝은 곳에서 다시',
-  FEW_INGREDIENTS:'성분이 몇 개 안 읽혔어요. 성분면을 꽉 채워서'
+  // 실사용 데이터상 대부분 앞면·사용법면을 찍어서 발생했다. 무엇을 다시 찍어야 하는지 알려준다.
+  FEW_INGREDIENTS:'성분을 못 찾았어요. 뒷면 [전성분] 부분을 찍어주세요'
 };
 
 /* GlobalResponse({success, code, message, data}) 언랩 + 타임아웃 */
