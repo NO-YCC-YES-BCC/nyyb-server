@@ -8,6 +8,7 @@ public record CompatibilityIssueDto(
         RoutineSlot slot,
         Long routineProductId,
         String routineProductName,
+        int overlappingIngredientCount,
         List<String> overlappingIngredients,
         String reason
 ) {

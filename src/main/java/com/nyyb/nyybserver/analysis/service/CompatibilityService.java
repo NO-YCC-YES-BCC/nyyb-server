@@ -1,6 +1,8 @@
 package com.nyyb.nyybserver.analysis.service;
 
 import com.nyyb.nyybserver.analysis.data.dto.response.CompatibilityIssueDto;
+import com.nyyb.nyybserver.analysis.data.dto.response.CompatibilityDuplicateReportDto;
+import com.nyyb.nyybserver.analysis.data.dto.response.CompatibilityIngredientNoticeDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.CompatibilityResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmCompatibilityIssueDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmCompatibilityResponseDto;
@@ -14,6 +16,9 @@ import com.nyyb.nyybserver.analysis.data.exception.ProductNotFoundException;
 import com.nyyb.nyybserver.analysis.data.repository.ProductIngredientRepository;
 import com.nyyb.nyybserver.analysis.data.repository.ProductRepository;
 import com.nyyb.nyybserver.ingredient.data.entity.Ingredient;
+import com.nyyb.nyybserver.ingredient.data.entity.Allergic;
+import com.nyyb.nyybserver.ingredient.data.enums.RiskLevel;
+import com.nyyb.nyybserver.ingredient.data.repository.AllergicRepository;
 import com.nyyb.nyybserver.routine.data.entity.Routine;
 import com.nyyb.nyybserver.routine.data.entity.RoutineItem;
 import com.nyyb.nyybserver.routine.data.repository.RoutineItemRepository;
@@ -26,12 +31,15 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -39,6 +47,23 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CompatibilityService {
 
+    private static final String REPORT_TITLE = "분석이 모두 완료되었어요!";
+    private static final String REPORT_DESCRIPTION =
+            "구매 예정인 제품과 기존 제품의 성분을 비교했어요.";
+    private static final String INGREDIENT_NOTICE_TITLE =
+            "주의 정보가 등록된 성분이 포함되어 있어요.";
+    private static final String MFDS_SOURCE = "식품의약품안전처";
+    private static final String ALLERGEN_NOTICE =
+            "해당 성분은 알레르기 유발 가능성이 있습니다.";
+    private static final String ALLERGEN_THRESHOLD_NOTICE =
+            "※ 다만, 사용 후 씻어내는 제품에는 0.01% 초과, 사용 후 씻어내지 않는 제품에는 0.001% 초과 함유하는 경우에 한한다.";
+    private static final String PROHIBITED_INGREDIENT_NOTICE =
+            "사용금지된 성분입니다.";
+    private static final String INGREDIENT_INFORMATION_DISCLAIMER =
+            "본 정보는 식품의약품안전처 공개 기준을 그대로 안내하는 것이며, 개별 사용자의 사용 적합성·안전성 또는 알레르기 발생 여부를 진단·보증하는 것이 아닙니다.";
+    private static final Pattern USAGE_LIMIT_PATTERN = Pattern.compile(
+            "사용기준\\s*[:：]\\s*(\\d+(?:\\.\\d+)?%)(?=\\s|[.,。]|$)"
+    );
     private static final String DISCLAIMER =
             "본 분석은 성분 정보 참고용이며, 효능·안전성을 진단·보증하지 않습니다.";
     private static final String UNKNOWN_SUMMARY =
@@ -57,6 +82,7 @@ public class CompatibilityService {
     private final CompatibilityAnalyzer compatibilityAnalyzer;
     private final ProductRepository productRepository;
     private final ProductIngredientRepository productIngredientRepository;
+    private final AllergicRepository allergicRepository;
     private final RoutineRepository routineRepository;
     private final RoutineItemRepository routineItemRepository;
 
@@ -75,7 +101,7 @@ public class CompatibilityService {
         List<RoutineProductContext> currentProducts = currentProducts(routineItems);
 
         if (currentProducts.isEmpty() || !hasCandidateData(candidate, candidateIngredients)) {
-            return unknownResponse(candidate, ocrResult, routine);
+            return unknownResponse(candidate, ocrResult, routine, candidateIngredients);
         }
 
         log.info("신규 제품 궁합 분석을 요청합니다. userId={}, routineId={}, productId={}",
@@ -135,7 +161,8 @@ public class CompatibilityService {
     private CompatibilityResponseDto unknownResponse(
             Product candidate,
             OcrResponseDto ocrResult,
-            Routine routine
+            Routine routine,
+            List<ProductIngredient> candidateIngredients
     ) {
         return new CompatibilityResponseDto(
                 candidate.getId(),
@@ -150,6 +177,12 @@ public class CompatibilityService {
                 UNKNOWN_SUMMARY,
                 UNKNOWN_GUIDE,
                 List.of(),
+                REPORT_TITLE,
+                REPORT_DESCRIPTION,
+                purchaseAdvice(CompatibilityStatus.UNKNOWN),
+                null,
+                INGREDIENT_NOTICE_TITLE,
+                buildIngredientNotices(candidateIngredients),
                 DISCLAIMER
         );
     }
@@ -165,6 +198,8 @@ public class CompatibilityService {
         CompatibilityStatus status = analysis.status() == null
                 ? CompatibilityStatus.UNKNOWN
                 : analysis.status();
+        List<CompatibilityIssueDto> issues =
+                sanitizeIssues(analysis.issues(), candidateIngredients, currentProducts);
 
         return new CompatibilityResponseDto(
                 candidate.getId(),
@@ -178,7 +213,13 @@ public class CompatibilityService {
                 analysis.recommendedSlot() == null ? RoutineSlot.BOTH : analysis.recommendedSlot(),
                 safeText(analysis.summary(), defaultSummary(status)),
                 safeText(analysis.usageGuide(), defaultUsageGuide(status)),
-                sanitizeIssues(analysis.issues(), candidateIngredients, currentProducts),
+                issues,
+                REPORT_TITLE,
+                REPORT_DESCRIPTION,
+                purchaseAdvice(status),
+                buildDuplicateReport(issues),
+                INGREDIENT_NOTICE_TITLE,
+                buildIngredientNotices(candidateIngredients),
                 DISCLAIMER
         );
     }
@@ -200,15 +241,114 @@ public class CompatibilityService {
                 .filter(issue -> contextByProductId.containsKey(issue.routineProductId()))
                 .map(issue -> {
                     RoutineProductContext context = contextByProductId.get(issue.routineProductId());
+                    List<String> overlappingIngredients =
+                            overlappingIngredients(candidateIngredients, context.ingredients());
                     return new CompatibilityIssueDto(
                             normalizeIssueSlot(issue.slot(), context.slots()),
                             context.product().getId(),
                             displayName(context.product()),
-                            overlappingIngredients(candidateIngredients, context.ingredients()),
+                            overlappingIngredients.size(),
+                            overlappingIngredients,
                             safeText(issue.reason(), DEFAULT_ISSUE_REASON)
                     );
                 })
                 .toList();
+    }
+
+    /** 화면 상단의 구매 안내 문구를 궁합 상태에 따라 결정한다. */
+    private String purchaseAdvice(CompatibilityStatus status) {
+        return switch (status) {
+            case GOOD -> "구매해도 괜찮아요.";
+            case CAUTION -> "구매 전 중복 성분을 한 번 더 확인해볼 수 있어요.";
+            case NOT_RECOMMENDED -> "구매하지 않아도 괜찮아요.";
+            case UNKNOWN -> "성분 정보를 다시 확인해 주세요.";
+        };
+    }
+
+    /** 실제로 같은 성분이 확인된 제품만 중복 카드에 포함한다. */
+    private CompatibilityDuplicateReportDto buildDuplicateReport(List<CompatibilityIssueDto> issues) {
+        List<CompatibilityIssueDto> duplicatedProducts = issues.stream()
+                .filter(issue -> issue.overlappingIngredientCount() > 0)
+                .toList();
+
+        if (duplicatedProducts.isEmpty()) {
+            return null;
+        }
+
+        return new CompatibilityDuplicateReportDto(
+                duplicatedProducts.size(),
+                "루틴에서 사용 중인 제품들과 성분이 중복되어 있어요.",
+                duplicatedProducts
+        );
+    }
+
+    /**
+     * 알레르기 등록 성분이나 DB 설명에서 사용금지·제한 근거가 명확한 성분만 전달한다.
+     * 위험도나 독성 값만 보고 별도의 위험 문구를 추측해서 만들지 않는다.
+     */
+    private List<CompatibilityIngredientNoticeDto> buildIngredientNotices(
+            List<ProductIngredient> productIngredients
+    ) {
+        Map<String, Allergic> allergicIndex = allergicRepository.findAll().stream()
+                .collect(Collectors.toMap(
+                        allergic -> normalizeName(allergic.getName()),
+                        Function.identity(),
+                        (first, ignored) -> first,
+                        LinkedHashMap::new
+                ));
+        Map<String, CompatibilityIngredientNoticeDto> notices = new LinkedHashMap<>();
+
+        for (ProductIngredient productIngredient : productIngredients) {
+            Ingredient ingredient = productIngredient.getIngredient();
+            if (ingredient == null || !StringUtils.hasText(ingredient.getName())) {
+                continue;
+            }
+
+            Allergic allergic = allergicIndex.get(normalizeName(ingredient.getName()));
+            String regulatoryNotice = regulatoryNotice(ingredient);
+            if (allergic == null && regulatoryNotice == null) {
+                continue;
+            }
+
+            String key = ingredient.getId() == null
+                    ? normalizeName(ingredient.getName())
+                    : String.valueOf(ingredient.getId());
+            notices.putIfAbsent(key, new CompatibilityIngredientNoticeDto(
+                    ingredient.getId(),
+                    ingredient.getName(),
+                    ingredient.getRiskLevel(),
+                    allergic != null,
+                    MFDS_SOURCE,
+                    allergic == null ? null : ALLERGEN_NOTICE,
+                    allergic == null ? null : ALLERGEN_THRESHOLD_NOTICE,
+                    regulatoryNotice,
+                    ingredient.getDescription(),
+                    INGREDIENT_INFORMATION_DISCLAIMER
+            ));
+        }
+
+        return List.copyOf(notices.values());
+    }
+
+    /**
+     * DB 원문에 제한 근거와 사용기준 수치가 함께 있을 때만 제한 문구를 만든다.
+     * 수치는 정규식으로 원문 그대로 가져오며 반올림하거나 임의 보정하지 않는다.
+     */
+    private String regulatoryNotice(Ingredient ingredient) {
+        if (ingredient.getRiskLevel() != RiskLevel.DISALLOWED
+                || !StringUtils.hasText(ingredient.getDescription())) {
+            return null;
+        }
+
+        String description = ingredient.getDescription();
+        Matcher usageLimitMatcher = USAGE_LIMIT_PATTERN.matcher(description);
+        if (description.contains("제한 원료") && usageLimitMatcher.find()) {
+            return "사용기준 " + usageLimitMatcher.group(1) + "로 제한된 성분입니다.";
+        }
+        if (description.contains("사용금지 원료")) {
+            return PROHIBITED_INGREDIENT_NOTICE;
+        }
+        return null;
     }
 
     private RoutineSlot normalizeIssueSlot(RoutineSlot requested, List<RoutineSlot> activeSlots) {
