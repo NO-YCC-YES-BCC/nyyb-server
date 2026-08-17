@@ -20,6 +20,12 @@ public record CompatibilityResponseDto(
         String summary,
         String usageGuide,
         List<CompatibilityIssueDto> issues,
+        String reportTitle,
+        String reportDescription,
+        String purchaseAdvice,
+        CompatibilityDuplicateReportDto duplicateReport,
+        String ingredientNoticeTitle,
+        List<CompatibilityIngredientNoticeDto> ingredientNotices,
         String disclaimer
 ) {
 }

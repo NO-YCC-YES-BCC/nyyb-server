@@ -43,7 +43,6 @@ public class AnalysisController {
     }
 
     @PostMapping(value = "/compatibility", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Compare a new cosmetic ingredient label with the latest routine")
     public GlobalResponse<CompatibilityResponseDto> compareCompatibility(
             @RequestPart("file") MultipartFile file
     ) {
