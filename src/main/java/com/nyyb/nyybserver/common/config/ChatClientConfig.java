@@ -15,6 +15,9 @@ public class ChatClientConfig {
     @Value("classpath:prompts/routine-system-prompt.st")
     private Resource routineSystemPrompt;
 
+    @Value("classpath:prompts/compatibility-system-prompt.st")
+    private Resource compatibilitySystemPrompt;
+
     // 빈 이름(chatClient / routineChatClient)을 주입 필드명과 맞춰 구분 주입한다.
     @Bean
     public ChatClient chatClient(ChatClient.Builder builder) {
@@ -27,6 +30,13 @@ public class ChatClientConfig {
     public ChatClient routineChatClient(ChatClient.Builder builder) {
         return builder
                 .defaultSystem(routineSystemPrompt)
+                .build();
+    }
+
+    @Bean
+    public ChatClient compatibilityChatClient(ChatClient.Builder builder) {
+        return builder
+                .defaultSystem(compatibilitySystemPrompt)
                 .build();
     }
 }

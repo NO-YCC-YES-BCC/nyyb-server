@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
@@ -18,6 +19,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     // analyze 요청 검증: 요청한 productId 중 본인 소유인 것만 (남의 제품 재매핑 방지)
     List<Product> findByIdInAndUserId(Collection<Long> ids, Long userId);
+
+    // 단일 제품 소유권 검증 조회
+    Optional<Product> findByIdAndUserId(Long id, Long userId);
 
     // 게스트→소셜 병합 시 소유자 재지정
     @Modifying

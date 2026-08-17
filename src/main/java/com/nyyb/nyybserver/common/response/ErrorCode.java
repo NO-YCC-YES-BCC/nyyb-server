@@ -32,6 +32,7 @@ public enum ErrorCode {
     // 502
     OCR_API_FAILED("C5021", "OCR 서비스 호출에 실패했습니다.", 502),
     KAKAO_API_FAILED("C5022", "카카오 API 호출에 실패했습니다.", 502),
+    COMPATIBILITY_API_FAILED("C5023", "궁합 분석 서비스 호출에 실패했습니다.", 502),
 
     // 500
     IMAGE_UPLOAD_FAILED("C5001", "이미지 업로드에 실패했습니다.", 500),
