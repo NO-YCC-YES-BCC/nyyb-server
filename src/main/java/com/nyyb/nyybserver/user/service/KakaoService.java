@@ -3,14 +3,12 @@ package com.nyyb.nyybserver.user.service;
 import com.nyyb.nyybserver.common.response.ErrorCode;
 import com.nyyb.nyybserver.common.security.AuthTokens;
 import com.nyyb.nyybserver.common.security.JwtTokenProvider;
-import com.nyyb.nyybserver.user.data.dto.response.KakaoNotificationResponseDto;
 import com.nyyb.nyybserver.user.data.dto.response.KakaoTokenResponseDto;
 import com.nyyb.nyybserver.user.data.dto.response.KakaoUserInfoResponseDto;
 import com.nyyb.nyybserver.user.data.dto.response.SocialLoginResponseDto;
 import com.nyyb.nyybserver.user.data.entity.User;
 import com.nyyb.nyybserver.user.data.enums.AuthProvider;
 import com.nyyb.nyybserver.user.data.exception.OAuthProcessException;
-import com.nyyb.nyybserver.user.data.exception.UserNotFoundException;
 import com.nyyb.nyybserver.user.data.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -144,21 +142,6 @@ public class KakaoService {
                 kakaoUser.providerId(),
                 kakaoUser.nickname()
         ));
-    }
-
-    @Transactional
-    public void updateKakaoNotification(Long userId, boolean enabled) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(UserNotFoundException::new);
-
-        user.updateKakaoNotification(enabled);
-    }
-
-    public KakaoNotificationResponseDto getKakaoNotification(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(UserNotFoundException::new);
-
-        return new KakaoNotificationResponseDto(user.getNotifyKakao());
     }
 
     private record KakaoUserProfile(
