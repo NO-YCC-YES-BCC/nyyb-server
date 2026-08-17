@@ -3,13 +3,16 @@ package com.nyyb.nyybserver.analysis.controller;
 import com.nyyb.nyybserver.analysis.data.dto.request.AnalysisRequestDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.AnalysisResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.AnalysisSummaryDto;
+import com.nyyb.nyybserver.analysis.data.dto.response.CompatibilityResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.OcrResponseDto;
 import com.nyyb.nyybserver.analysis.service.AnalysisService;
+import com.nyyb.nyybserver.analysis.service.CompatibilityService;
 import com.nyyb.nyybserver.analysis.service.OcrService;
 import com.nyyb.nyybserver.common.dto.PageRequestDto;
 import com.nyyb.nyybserver.common.response.GlobalResponse;
 import com.nyyb.nyybserver.common.security.SecurityUtil;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.MediaType;
@@ -27,6 +30,7 @@ public class AnalysisController {
 
     private final OcrService ocrService;
     private final AnalysisService analysisService;
+    private final CompatibilityService compatibilityService;
 
     @PostMapping(value = "/ocr", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public GlobalResponse<OcrResponseDto> ocr(@RequestPart("file") MultipartFile file) {
@@ -36,6 +40,14 @@ public class AnalysisController {
     @PostMapping
     public GlobalResponse<AnalysisResponseDto> analyze(@RequestBody AnalysisRequestDto request) {
         return GlobalResponse.ok(analysisService.analyze(request, SecurityUtil.getUserId()));
+    }
+
+    @PostMapping(value = "/compatibility", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Compare a new cosmetic ingredient label with the latest routine")
+    public GlobalResponse<CompatibilityResponseDto> compareCompatibility(
+            @RequestPart("file") MultipartFile file
+    ) {
+        return GlobalResponse.ok(compatibilityService.compare(file, SecurityUtil.getUserId()));
     }
 
     // 현재 로그인 유저의 분석 목록(id + title) 최신순 조회
