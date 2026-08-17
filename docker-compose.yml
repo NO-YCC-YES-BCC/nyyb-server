@@ -1,12 +1,36 @@
-# SOTT 배포 스택 (OCI VM) — nyyb-server + nginx
-# DB는 Aiven MySQL(외부)이라 여기서 띄우지 않는다.
+# SOTT 배포 스택 (OCI VM) — MySQL + nyyb-server + nginx
+# DB를 VM 안에서 직접 띄운다(외부 무료 티어 만료 이슈 회피). 데이터는 mysql_data 볼륨에 영속.
 # 비밀값은 이 파일 옆의 .env에서 주입 (.env.example 참고)
 services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    # 외부 포트를 열지 않는다. 접근은 compose 네트워크 안에서만.
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 40s
+
   sott-be:
     build: .
     restart: unless-stopped
     expose:
       - "8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: prod
 
@@ -46,6 +70,7 @@ services:
       - sott-be
 
 volumes:
+  mysql_data:
   # 최초 1회 생성 필요:
   #   docker volume create sott_certbot_conf
   #   docker volume create sott_certbot_www
