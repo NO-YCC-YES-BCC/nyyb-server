@@ -4,8 +4,6 @@ import com.nyyb.nyybserver.common.response.GlobalResponse;
 import com.nyyb.nyybserver.common.security.SecurityUtil;
 import com.nyyb.nyybserver.common.security.UserPrincipal;
 import com.nyyb.nyybserver.user.data.dto.request.KakaoLoginRequestDto;
-import com.nyyb.nyybserver.user.data.dto.request.KakaoNotificationRequestDto;
-import com.nyyb.nyybserver.user.data.dto.response.KakaoNotificationResponseDto;
 import com.nyyb.nyybserver.user.data.dto.response.SocialLoginResponseDto;
 import com.nyyb.nyybserver.user.service.KakaoService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -70,23 +68,5 @@ public class UserController {
 
     private Long guestUserId(UserPrincipal principal) {
         return principal == null ? null : principal.id();
-    }
-
-    @PatchMapping("/notify-kakao")
-    public GlobalResponse<Void> updatekakoNotification(@RequestBody KakaoNotificationRequestDto kakaoNotificationRequestDto) {
-        Long userId = SecurityUtil.getUserId();
-
-        kakaoService.updateKakaoNotification(userId, kakaoNotificationRequestDto.enabled());
-
-        return GlobalResponse.ok();
-    }
-
-    @GetMapping("/notify-kakao")
-    public GlobalResponse<KakaoNotificationResponseDto> getKakaoNotification() {
-        Long userId = SecurityUtil.getUserId();
-
-        return GlobalResponse.ok(
-                kakaoService.getKakaoNotification(userId)
-        );
     }
 }
