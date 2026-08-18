@@ -6,12 +6,13 @@ import com.nyyb.nyybserver.analysis.data.dto.response.CompatibilityIngredientNot
 import com.nyyb.nyybserver.analysis.data.dto.response.CompatibilityResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmCompatibilityIssueDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmCompatibilityResponseDto;
-import com.nyyb.nyybserver.analysis.data.dto.response.OcrResponseDto;
+import com.nyyb.nyybserver.analysis.data.dto.response.OcrIngredientDto;
 import com.nyyb.nyybserver.analysis.data.entity.Product;
 import com.nyyb.nyybserver.analysis.data.entity.ProductIngredient;
 import com.nyyb.nyybserver.analysis.data.enums.CompatibilityStatus;
 import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 import com.nyyb.nyybserver.analysis.data.enums.RoutineSlot;
+import com.nyyb.nyybserver.analysis.data.exception.InvalidCompatibilityRequestException;
 import com.nyyb.nyybserver.analysis.data.exception.ProductNotFoundException;
 import com.nyyb.nyybserver.analysis.data.repository.ProductIngredientRepository;
 import com.nyyb.nyybserver.analysis.data.repository.ProductRepository;
@@ -28,7 +29,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -36,7 +36,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -78,7 +80,6 @@ public class CompatibilityService {
             "절대", "무조건"
     );
 
-    private final OcrService ocrService;
     private final CompatibilityAnalyzer compatibilityAnalyzer;
     private final ProductRepository productRepository;
     private final ProductIngredientRepository productIngredientRepository;
@@ -86,22 +87,25 @@ public class CompatibilityService {
     private final RoutineRepository routineRepository;
     private final RoutineItemRepository routineItemRepository;
 
-    public CompatibilityResponseDto compare(MultipartFile image, Long userId) {
-        Routine routine = routineRepository.findFirstByUserIdOrderByCreatedAtDescIdDesc(userId)
-                .orElseThrow(RoutineNotFoundException::new);
+    public CompatibilityResponseDto compare(Long productId, UUID routineId, Long userId) {
+        if (productId == null || routineId == null) {
+            throw new InvalidCompatibilityRequestException();
+        }
 
-        OcrResponseDto ocrResult = ocrService.ocr(image, userId);
-        Product candidate = productRepository.findByIdAndUserId(ocrResult.getProductId(), userId)
+        Routine routine = routineRepository.findByIdAndUserId(routineId, userId)
+                .orElseThrow(RoutineNotFoundException::new);
+        Product candidate = productRepository.findByIdAndUserId(productId, userId)
                 .orElseThrow(ProductNotFoundException::new);
 
         List<ProductIngredient> candidateIngredients =
                 productIngredientRepository.findByProductIdWithIngredient(candidate.getId());
+        List<OcrIngredientDto> ocrIngredients = toOcrIngredients(candidateIngredients);
         List<RoutineItem> routineItems =
                 routineItemRepository.findByRoutineIdWithProductAndSelections(routine.getId());
         List<RoutineProductContext> currentProducts = currentProducts(routineItems);
 
         if (currentProducts.isEmpty() || !hasCandidateData(candidate, candidateIngredients)) {
-            return unknownResponse(candidate, ocrResult, routine, candidateIngredients);
+            return unknownResponse(candidate, routine, candidateIngredients, ocrIngredients);
         }
 
         log.info("신규 제품 궁합 분석을 요청합니다. userId={}, routineId={}, productId={}",
@@ -111,7 +115,7 @@ public class CompatibilityService {
                 buildUserMessage(candidate, candidateIngredients, routine, currentProducts)
         );
 
-        return toResponse(candidate, ocrResult, routine, candidateIngredients, currentProducts, analysis);
+        return toResponse(candidate, routine, candidateIngredients, ocrIngredients, currentProducts, analysis);
     }
 
     private List<RoutineProductContext> currentProducts(List<RoutineItem> items) {
@@ -160,20 +164,18 @@ public class CompatibilityService {
 
     private CompatibilityResponseDto unknownResponse(
             Product candidate,
-            OcrResponseDto ocrResult,
             Routine routine,
-            List<ProductIngredient> candidateIngredients
+            List<ProductIngredient> candidateIngredients,
+            List<OcrIngredientDto> ocrIngredients
     ) {
         return new CompatibilityResponseDto(
                 candidate.getId(),
                 "새 제품",
                 candidate.getCategory(),
-                ocrResult.getIngredientCount(),
-                safeList(ocrResult.getIngredients()),
+                candidate.getIngredientCount(),
+                ocrIngredients,
                 routine.getId(),
                 CompatibilityStatus.UNKNOWN,
-                0,
-                RoutineSlot.BOTH,
                 UNKNOWN_SUMMARY,
                 UNKNOWN_GUIDE,
                 List.of(),
@@ -189,9 +191,9 @@ public class CompatibilityService {
 
     private CompatibilityResponseDto toResponse(
             Product candidate,
-            OcrResponseDto ocrResult,
             Routine routine,
             List<ProductIngredient> candidateIngredients,
+            List<OcrIngredientDto> ocrIngredients,
             List<RoutineProductContext> currentProducts,
             LlmCompatibilityResponseDto analysis
     ) {
@@ -205,12 +207,10 @@ public class CompatibilityService {
                 candidate.getId(),
                 StringUtils.hasText(analysis.productName()) ? analysis.productName().strip() : "새 제품",
                 candidate.getCategory(),
-                ocrResult.getIngredientCount(),
-                safeList(ocrResult.getIngredients()),
+                candidate.getIngredientCount(),
+                ocrIngredients,
                 routine.getId(),
                 status,
-                clampScore(analysis.score()),
-                analysis.recommendedSlot() == null ? RoutineSlot.BOTH : analysis.recommendedSlot(),
                 safeText(analysis.summary(), defaultSummary(status)),
                 safeText(analysis.usageGuide(), defaultUsageGuide(status)),
                 issues,
@@ -446,6 +446,20 @@ public class CompatibilityService {
         return ingredient == null ? productIngredient.getRawName() : ingredient.getName();
     }
 
+    /** OCR 단계에서 저장된 성분 엔티티를 기존 OCR 응답과 같은 요약 형식으로 변환한다. */
+    private List<OcrIngredientDto> toOcrIngredients(List<ProductIngredient> productIngredients) {
+        return productIngredients.stream()
+                .map(ProductIngredient::getIngredient)
+                .filter(Objects::nonNull)
+                .map(ingredient -> OcrIngredientDto.builder()
+                        .ingredientId(ingredient.getId())
+                        .name(ingredient.getName())
+                        .isToxic(ingredient.getIsToxic())
+                        .riskLevel(ingredient.getRiskLevel())
+                        .build())
+                .toList();
+    }
+
     private String normalizeName(String value) {
         return value.replaceAll("[\\s_-]", "").toLowerCase(Locale.ROOT);
     }
@@ -454,13 +468,6 @@ public class CompatibilityService {
         return StringUtils.hasText(product.getProductName())
                 ? product.getProductName()
                 : product.getCategory().name() + " " + product.getId();
-    }
-
-    private int clampScore(Integer score) {
-        if (score == null) {
-            return 0;
-        }
-        return Math.max(0, Math.min(100, score));
     }
 
     private String safeText(String value, String fallback) {
@@ -489,10 +496,6 @@ public class CompatibilityService {
             case NOT_RECOMMENDED -> "같은 역할의 기존 제품과 번갈아 사용하는 방법을 고려해볼 수 있어요.";
             case UNKNOWN -> UNKNOWN_GUIDE;
         };
-    }
-
-    private <T> List<T> safeList(List<T> values) {
-        return values == null ? List.of() : List.copyOf(values);
     }
 
     private record RoutineProductContext(

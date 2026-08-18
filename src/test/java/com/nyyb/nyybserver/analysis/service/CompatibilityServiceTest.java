@@ -3,14 +3,13 @@ package com.nyyb.nyybserver.analysis.service;
 import com.nyyb.nyybserver.analysis.data.dto.response.CompatibilityResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmCompatibilityIssueDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmCompatibilityResponseDto;
-import com.nyyb.nyybserver.analysis.data.dto.response.OcrIngredientDto;
-import com.nyyb.nyybserver.analysis.data.dto.response.OcrResponseDto;
 import com.nyyb.nyybserver.analysis.data.entity.Product;
 import com.nyyb.nyybserver.analysis.data.entity.ProductIngredient;
 import com.nyyb.nyybserver.analysis.data.enums.CompatibilityStatus;
 import com.nyyb.nyybserver.analysis.data.enums.ProductCategory;
 import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 import com.nyyb.nyybserver.analysis.data.enums.RoutineSlot;
+import com.nyyb.nyybserver.analysis.data.exception.InvalidCompatibilityRequestException;
 import com.nyyb.nyybserver.analysis.data.repository.ProductIngredientRepository;
 import com.nyyb.nyybserver.analysis.data.repository.ProductRepository;
 import com.nyyb.nyybserver.ingredient.data.entity.Allergic;
@@ -29,7 +28,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.List;
 import java.util.Optional;
@@ -46,9 +44,6 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class CompatibilityServiceTest {
-
-    @Mock
-    private OcrService ocrService;
 
     @Mock
     private CompatibilityAnalyzer compatibilityAnalyzer;
@@ -75,9 +70,6 @@ class CompatibilityServiceTest {
     void compareUsesOnlyProductsKeptInTheCurrentRoutine() {
         Long userId = 7L;
         UUID routineId = UUID.randomUUID();
-        MockMultipartFile image = new MockMultipartFile(
-                "file", "ingredients.jpg", "image/jpeg", new byte[]{1, 2, 3}
-        );
 
         Routine routine = Routine.builder().id(routineId).title("현재 루틴").build();
         Product candidate = product(200L, "새 제품 성분표", null);
@@ -134,19 +126,6 @@ class CompatibilityServiceTest {
         ProductIngredient unverifiedProductIngredient = productIngredient(candidate, unverifiedIngredient);
         ProductIngredient keptIngredient = productIngredient(keptProduct, limonene);
 
-        OcrIngredientDto ocrIngredient = OcrIngredientDto.builder()
-                .ingredientId(limonene.getId())
-                .name(limonene.getName())
-                .isToxic(false)
-                .riskLevel(RiskLevel.LOW)
-                .build();
-        OcrResponseDto ocrResult = OcrResponseDto.builder()
-                .productId(candidate.getId())
-                .category(candidate.getCategory())
-                .ingredientCount(1)
-                .ingredients(List.of(ocrIngredient))
-                .build();
-
         LlmCompatibilityResponseDto llmResponse = new LlmCompatibilityResponseDto(
                 "테스트 세럼",
                 CompatibilityStatus.CAUTION,
@@ -168,9 +147,8 @@ class CompatibilityServiceTest {
                 )
         );
 
-        when(routineRepository.findFirstByUserIdOrderByCreatedAtDescIdDesc(userId))
+        when(routineRepository.findByIdAndUserId(routineId, userId))
                 .thenReturn(Optional.of(routine));
-        when(ocrService.ocr(image, userId)).thenReturn(ocrResult);
         when(productRepository.findByIdAndUserId(candidate.getId(), userId))
                 .thenReturn(Optional.of(candidate));
         when(productIngredientRepository.findByProductIdWithIngredient(candidate.getId()))
@@ -187,13 +165,13 @@ class CompatibilityServiceTest {
         when(allergicRepository.findAll()).thenReturn(List.of(registeredAllergen));
         when(compatibilityAnalyzer.analyze(anyString())).thenReturn(llmResponse);
 
-        CompatibilityResponseDto response = compatibilityService.compare(image, userId);
+        CompatibilityResponseDto response = compatibilityService.compare(candidate.getId(), routineId, userId);
 
         assertEquals(candidate.getId(), response.productId());
+        assertEquals(4, response.ingredientCount());
+        assertEquals(4, response.ingredients().size());
         assertEquals("테스트 세럼", response.productName());
         assertEquals(CompatibilityStatus.CAUTION, response.status());
-        assertEquals(100, response.score());
-        assertEquals(RoutineSlot.EVENING, response.recommendedSlot());
         assertEquals(
                 "현재 루틴과 겹치는 구성이 있어 사용 시간대를 나누는 방법을 고려해볼 수 있어요.",
                 response.summary()
@@ -258,18 +236,25 @@ class CompatibilityServiceTest {
     }
 
     @Test
-    void compareChecksForCurrentRoutineBeforeCallingOcr() {
+    void compareRejectsRoutineNotOwnedByCurrentUserBeforeLoadingProduct() {
         Long userId = 99L;
-        MockMultipartFile image = new MockMultipartFile(
-                "file", "ingredients.jpg", "image/jpeg", new byte[]{1}
-        );
-        when(routineRepository.findFirstByUserIdOrderByCreatedAtDescIdDesc(userId))
+        Long productId = 200L;
+        UUID routineId = UUID.randomUUID();
+        when(routineRepository.findByIdAndUserId(routineId, userId))
                 .thenReturn(Optional.empty());
 
         assertThrows(RoutineNotFoundException.class,
-                () -> compatibilityService.compare(image, userId));
+                () -> compatibilityService.compare(productId, routineId, userId));
 
-        verify(ocrService, never()).ocr(image, userId);
+        verify(productRepository, never()).findByIdAndUserId(productId, userId);
+    }
+
+    @Test
+    void compareRejectsRequestWithoutProductOrRoutineId() {
+        assertThrows(InvalidCompatibilityRequestException.class,
+                () -> compatibilityService.compare(null, UUID.randomUUID(), 7L));
+        assertThrows(InvalidCompatibilityRequestException.class,
+                () -> compatibilityService.compare(200L, null, 7L));
     }
 
     private Product product(Long id, String ocrText, String productName) {
@@ -279,6 +264,7 @@ class CompatibilityServiceTest {
                 .category(ProductCategory.SERUM)
                 .productName(productName)
                 .ocrText(ocrText)
+                .ingredientCount(4)
                 .build();
     }
 

@@ -1,6 +1,7 @@
 package com.nyyb.nyybserver.analysis.controller;
 
 import com.nyyb.nyybserver.analysis.data.dto.request.AnalysisRequestDto;
+import com.nyyb.nyybserver.analysis.data.dto.request.CompatibilityRequestDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.AnalysisResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.AnalysisSummaryDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.CompatibilityResponseDto;
@@ -42,11 +43,15 @@ public class AnalysisController {
         return GlobalResponse.ok(analysisService.analyze(request, SecurityUtil.getUserId()));
     }
 
-    @PostMapping(value = "/compatibility", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/compatibility", consumes = MediaType.APPLICATION_JSON_VALUE)
     public GlobalResponse<CompatibilityResponseDto> compareCompatibility(
-            @RequestPart("file") MultipartFile file
+            @RequestBody CompatibilityRequestDto request
     ) {
-        return GlobalResponse.ok(compatibilityService.compare(file, SecurityUtil.getUserId()));
+        return GlobalResponse.ok(compatibilityService.compare(
+                request.productId(),
+                request.routineId(),
+                SecurityUtil.getUserId()
+        ));
     }
 
     // 현재 로그인 유저의 분석 목록(id + title) 최신순 조회
