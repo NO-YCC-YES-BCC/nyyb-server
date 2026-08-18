@@ -28,6 +28,18 @@ services:
       retries: 15
       start_period: 40s
 
+  nyyb-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - nyyb_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   nyyb-be:
     build: .
     restart: unless-stopped
@@ -36,8 +48,13 @@ services:
     depends_on:
       nyyb-mariadb:
         condition: service_healthy
+      nyyb-redis:
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: prod
+
+      REDIS_HOST: nyyb-redis
+      REDIS_PORT: 6379
 
       DB_DRIVER_CLASS_NAME: org.mariadb.jdbc.Driver
       DB_URL: ${DB_URL}
@@ -72,6 +89,7 @@ services:
 
 volumes:
   nyyb_db_data:
+  nyyb_redis_data:
 
 networks:
   web:
