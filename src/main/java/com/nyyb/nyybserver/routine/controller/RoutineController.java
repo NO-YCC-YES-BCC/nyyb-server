@@ -9,6 +9,7 @@ import com.nyyb.nyybserver.routine.data.dto.response.RoutineDesignResponseDto;
 import com.nyyb.nyybserver.routine.data.dto.response.RoutineDayResponseDto;
 import com.nyyb.nyybserver.routine.data.dto.response.RoutineSummaryDto;
 import com.nyyb.nyybserver.routine.service.RoutineService;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -26,6 +27,7 @@ public class RoutineController {
 
     private final RoutineService routineService;
 
+    // 내 루틴 목록을 최신순으로 조회한다. page와 size를 쿼리 파라미터로 받을 수 있다.
     @GetMapping
     public GlobalResponse<List<RoutineSummaryDto>> getRoutines(@ParameterObject PageRequestDto pageRequest) {
         return GlobalResponse.ok(routineService.getRoutines(SecurityUtil.getUserId(), pageRequest.toPageable()));
@@ -51,16 +53,19 @@ public class RoutineController {
     }
 
     @PostMapping("/{routineId}/design")
+    @Operation(summary = "LLM 루틴 설계")
     public GlobalResponse<RoutineDesignResponseDto> designRoutine(@PathVariable UUID routineId) {
         return GlobalResponse.ok(routineService.designRoutine(routineId, SecurityUtil.getUserId()));
     }
 
+    // slot은 MORNING 또는 EVENING이며, 해당 시간대에 사용하는 제품과 추천 결과를 반환한다.
     @GetMapping("/{routineId}/day")
     public GlobalResponse<RoutineDayResponseDto> getRoutineDay(@PathVariable UUID routineId,
                                                                @RequestParam String slot) {
         return GlobalResponse.ok(routineService.getRoutineDay(routineId, SecurityUtil.getUserId(), parseSlot(slot)));
     }
 
+    // 사용자가 시간대별로 선택한 KEEP/REMOVE 값을 저장하고 루틴의 최종 제품 수를 갱신한다.
     @PatchMapping("/{routineId}/products")
     public GlobalResponse<UUID> saveRoutine(@PathVariable UUID routineId,
                                             @RequestBody RoutineSaveRequestDto request) {
