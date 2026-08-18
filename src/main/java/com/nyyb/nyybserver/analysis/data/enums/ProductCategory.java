@@ -19,6 +19,7 @@ public enum ProductCategory {
             "Cleansing Oil",
             CategoryGroup.CLEANSING,
             List.of("클렌징오일", "cleansing oil", "클렌징밤", "cleansing balm", "클렌징크림", "cleansing cream",
+                    "메이크업리무버", "makeup remover", "포인트리무버", "립앤아이")
     ),
 
     CLEANSING_WATER(
