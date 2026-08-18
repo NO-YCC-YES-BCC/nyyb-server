@@ -68,6 +68,9 @@ services:
       - certbot_www:/var/www/certbot:ro
     depends_on:
       - sott-be
+    networks:
+      - default   # sott-be 접근용
+      - web       # 본 서비스(nyyb-be) 접근용
 
 volumes:
   mysql_data:
@@ -80,3 +83,7 @@ volumes:
   certbot_www:
     external: true
     name: sott_certbot_www
+
+networks:
+  web:
+    external: true
