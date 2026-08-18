@@ -48,10 +48,6 @@ public class User {
     @Builder.Default
     private UserRole role = UserRole.USER;
 
-    @Column(name = "notify_kakao", nullable = false)
-    @Builder.Default
-    private Boolean notifyKakao = false;
-
     @Column(name = "merged_to_user_id")
     private Long mergedToUserId;
 
@@ -108,7 +104,4 @@ public class User {
         this.mergedToUserId = targetUser.getId();
     }
 
-    public void updateKakaoNotification(boolean enabled) {
-        this.notifyKakao = enabled;
-    }
 }

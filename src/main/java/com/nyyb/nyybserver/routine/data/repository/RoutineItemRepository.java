@@ -17,5 +17,12 @@ public interface RoutineItemRepository extends JpaRepository<RoutineItem, Long> 
     List<RoutineItem> findByRoutineIdWithProduct(@Param("routineId") UUID routineId);
 
     // 루틴에 담긴 제품 수 (루틴아이템 1 : 제품 1)
+    // Report detail: load products and the user's slot selections together.
+    @Query("select distinct ri from RoutineItem ri " +
+            "join fetch ri.product " +
+            "left join fetch ri.selections " +
+            "where ri.routine.id = :routineId")
+    List<RoutineItem> findByRoutineIdWithProductAndSelections(@Param("routineId") UUID routineId);
+
     long countByRoutineId(UUID routineId);
 }
