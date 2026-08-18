@@ -1,3 +1,8 @@
+# 리버스 프록시(nginx) 뒤에서 동작하므로 X-Forwarded-* 를 신뢰한다.
+# 이 설정이 없으면 Swagger 서버 URL이 http 로 생성되어 브라우저가 혼합 콘텐츠로 차단한다.
+server:
+  forward-headers-strategy: framework
+
 # 운영 설정 — 비밀값은 전부 환경변수로 주입 (이 파일은 커밋됨, 값 직접 기입 금지)
 spring:
   datasource:
