@@ -31,7 +31,7 @@ public class Product {
     private String imageKey; // 서버가 S3에 올린 사진 key(파일 경로)
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "varchar(30)")
     @Builder.Default
     private ProductCategory category = ProductCategory.ETC;
 
