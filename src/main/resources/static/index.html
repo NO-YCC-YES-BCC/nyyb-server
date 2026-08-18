@@ -147,6 +147,16 @@ p{margin:0 0 12px;color:var(--ink-60)}
 
   <p class="small">제품마다 이름을 다르게 적어서 사람 눈으로는 찾기 어렵습니다. 정제수·물·Water·Aqua가 모두 같은 성분입니다.</p>
   <button class="btn" id="go-capture">화장품 찍어보기</button>
+
+  <!-- 써보기 전 지불의사. 결과 화면의 것과 이벤트명을 분리해 기록한다. -->
+  <div class="ask" id="ask-pre" data-stage="pre" style="margin-top:22px">
+    <div class="q">새로 살 화장품이 지금 쓰는 것과 겹치는지 확인하는 기능, 1회 500원이면 쓰시겠어요?</div>
+    <div class="opts">
+      <button class="btn" data-w="yes">쓸 것 같아요</button>
+      <button class="btn ghost" data-w="no">안 쓸 것 같아요</button>
+    </div>
+    <div class="thx">답변 고맙습니다. 직접 확인해보셔도 좋아요.</div>
+  </div>
   <p class="small center" style="margin-top:14px;word-break:keep-all">업로드한 사진은 분석에만 쓰이고 이후 삭제됩니다.<br>베타 서비스입니다.</p>
 </section>
 
@@ -208,13 +218,13 @@ p{margin:0 0 12px;color:var(--ink-60)}
   <div id="r-overlap"></div>
   <p class="small" id="r-unmatched"></p>
 
-  <div class="ask" id="ask">
+  <div class="ask" id="ask" data-stage="post">
     <div class="q">새로 살 화장품이 지금 쓰는 것과 겹치는지 확인하는 기능, 1회 500원이면 쓰시겠어요?</div>
     <div class="opts">
       <button class="btn" data-w="yes">쓸 것 같아요</button>
       <button class="btn ghost" data-w="no">안 쓸 것 같아요</button>
     </div>
-    <div class="thx" id="thx">답변 고맙습니다.</div>
+    <div class="thx">답변 고맙습니다.</div>
   </div>
 
   <button class="btn ghost" id="again" style="margin-top:26px">처음부터 다시</button>
@@ -745,11 +755,16 @@ $('#start-analysis').onclick = async ()=>{
   }
 };
 
+// 랜딩(써보기 전)과 결과 화면(써본 후) 두 곳에서 묻는다. 섞이지 않게 이벤트명을 나눈다.
+//   pre  -> willingness_pre_yes / willingness_pre_no
+//   post -> willingness_yes     / willingness_no   (기존 이름 유지, 과거 데이터와 비교 가능)
 document.querySelectorAll('[data-w]').forEach(b=>{
   b.onclick = ()=>{
-    track('willingness_' + b.dataset.w);
-    $('#ask').querySelector('.opts').classList.add('hidden');
-    $('#thx').style.display = 'block';
+    const box = b.closest('.ask');
+    const pre = box.dataset.stage === 'pre';
+    track(pre ? 'willingness_pre_' + b.dataset.w : 'willingness_' + b.dataset.w);
+    box.querySelector('.opts').classList.add('hidden');
+    box.querySelector('.thx').style.display = 'block';
   };
 });
 
