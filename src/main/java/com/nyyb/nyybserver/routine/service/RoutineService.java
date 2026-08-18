@@ -309,7 +309,7 @@ public class RoutineService {
         for (Product product : products) {
             sb.append("=== productId: ").append(product.getId()).append(" ===\n");
             sb.append("productName: ").append(product.getProductName()).append("\n");
-            sb.append("category: ").append(product.getCategory().name()).append("\n");
+            sb.append("category: ").append(product.getCategory().describe()).append("\n");
             sb.append("recommended: ").append(product.getRecommended()).append("\n");
             sb.append("recommendReason: ").append(product.getRecommendReason()).append("\n");
             sb.append("ingredients: ").append(formatIngredients(product.getId())).append("\n\n");

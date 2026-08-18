@@ -212,7 +212,7 @@ public class AnalysisService {
             Product product = productMap.get(productId);
 
             sb.append("=== productId: ").append(productId).append(" ===\n");
-            sb.append("category: ").append(product.getCategory().name()).append("\n");
+            sb.append("category: ").append(product.getCategory().describe()).append("\n");
             sb.append("ocrText: ").append(product.getOcrText()).append("\n");
             sb.append("ingredients: ").append(formatIngredients(productId)).append("\n\n");
         }
