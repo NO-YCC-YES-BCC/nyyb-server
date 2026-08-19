@@ -1,10 +1,12 @@
 package com.nyyb.nyybserver.analysis.service;
 
 import com.nyyb.nyybserver.analysis.data.dto.request.AnalysisRequestDto;
+import com.nyyb.nyybserver.analysis.data.dto.response.AnalysisProductDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.AnalysisResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.AnalysisSummaryDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmAnalysisResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmProductAnalysisDto;
+import com.nyyb.nyybserver.analysis.data.dto.response.LlmProductNameDto;
 import com.nyyb.nyybserver.analysis.data.entity.Analysis;
 import com.nyyb.nyybserver.analysis.data.entity.Product;
 import com.nyyb.nyybserver.analysis.data.entity.ProductIngredient;
@@ -27,10 +29,12 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -44,8 +48,12 @@ public class AnalysisService {
 
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
+    // 이유 문구가 비어 온 경우에만 쓰는 기본값. 화면에 null·빈 칸이 그대로 나가지 않게 한다.
+    private static final String DEFAULT_KEEP_REASON = "겹치는 성분이 적어 유지를 고려해볼 수 있어요.";
+    private static final String DEFAULT_REMOVE_REASON = "성분 구성이 겹쳐 제외를 고려해볼 수 있어요.";
+
     // 응답 정렬: REMOVE 먼저, KEEP 나중 (analyze·상세 조회 공용)
-    private static final Comparator<LlmProductAnalysisDto> REMOVE_FIRST =
+    private static final Comparator<AnalysisProductDto> REMOVE_FIRST =
             Comparator.comparingInt(p -> p.recommended() == RecommendStatus.REMOVE ? 0 : 1);
 
     private final ChatClient chatClient;
@@ -76,7 +84,10 @@ public class AnalysisService {
         // (Product.id가 순차 증가라 열거가 쉬우므로, 검증 없이는 남의 제품을 자기 분석에 재매핑할 수 있다)
         Map<Long, Product> productMap = loadOwnedProducts(productIds, userId);
 
-        String userMessage = buildUserMessage(productIds, productMap);
+        // 프롬프트에 넣는 제품 순서는 촬영 순서(productId 오름차순)로 고정한다.
+        List<Long> orderedProductIds = productIds.stream().distinct().sorted().toList();
+
+        String userMessage = buildUserMessage(orderedProductIds, productMap);
         log.info("OpenAI 요청 메시지:\n{}", userMessage);
 
         // LLM 호출 + 구조화 출력(JSON -> DTO)
@@ -87,6 +98,19 @@ public class AnalysisService {
 
         log.info("OpenAI 응답:\n{}", llmResponse);
 
+        // strict 스키마라 필드 누락·null은 모델이 만들 수 없지만, 호출 자체가 빈 응답으로 끝나는 경우는 막아 둔다.
+        if (llmResponse == null || llmResponse.products() == null) {
+            throw new IllegalStateException("분석 응답이 비어 있습니다.");
+        }
+
+        // 1단계에서 확정된 제품명. 응답의 productName과 recommendReason 속 제품 지칭이 같은 이름을 쓰게 하는 단일 출처다.
+        Map<Long, String> productNames = resolveProductNames(llmResponse.productNames(), orderedProductIds, productMap);
+
+        // 저장 값과 응답 값이 갈라지지 않도록 제품별 결과를 한 번만 만들어 두 곳에 함께 쓴다.
+        List<AnalysisProductDto> analyzed = llmResponse.products().stream()
+                .map(result -> toProductDto(result, productMap, productNames))
+                .toList();
+
         // 한국 날짜 + 제품 개수로 만든 목록 표시용 문구 (분석·루틴 공용)
         String title = buildTitle(productIds.size());
 
@@ -95,7 +119,7 @@ public class AnalysisService {
                 .user(owner)
                 .title(title)
                 .build());
-        llmResponse.products().forEach(result -> applyToProduct(analysis, result, productMap));
+        analyzed.forEach(product -> applyToProduct(analysis, product, productMap));
 
         // saveRoutine 통합: 분석 1개당 Routine 1개 생성 + productId별 userRoutineSlot을 RoutineItem으로 저장
         Routine routine = routineRepository.save(Routine.builder()
@@ -114,7 +138,7 @@ public class AnalysisService {
         }
 
         // REMOVE 먼저, KEEP 나중 순으로 정렬해 반환
-        List<LlmProductAnalysisDto> sorted = llmResponse.products().stream()
+        List<AnalysisProductDto> sorted = analyzed.stream()
                 .sorted(REMOVE_FIRST)
                 .toList();
         return new AnalysisResponseDto(routine.getId(), title, sorted);
@@ -176,10 +200,10 @@ public class AnalysisService {
                 .orElse(null);
 
         // REMOVE 먼저, KEEP 나중 순으로 정렬해 반환 (analyze와 동일)
-        List<LlmProductAnalysisDto> products = productRepository.findByAnalysisIdOrderByIdAsc(analysisId).stream()
-                .map(product -> new LlmProductAnalysisDto(
+        List<AnalysisProductDto> products = productRepository.findByAnalysisIdOrderByIdAsc(analysisId).stream()
+                .map(product -> new AnalysisProductDto(
                         product.getId(),
-                        product.getProductName(),
+                        displayName(product),
                         product.getRecommended(),
                         product.getRecommendReason()))
                 .sorted(REMOVE_FIRST)
@@ -273,13 +297,77 @@ public class AnalysisService {
         return ingredient.getName() + "(" + risk + toxic + ")" + description;
     }
 
-    // 결과 -> 같은 productId Product에 반영. LLM이 요청에 없던 id를 지어내면 거절한다.
-    private void applyToProduct(Analysis analysis, LlmProductAnalysisDto result, Map<Long, Product> productMap) {
-        Product product = productMap.get(result.productId());
-        if (product == null) {
+    /**
+     * 1단계 productNames 응답을 productId -> 제품명 맵으로 정리한다.
+     * 제품명은 응답 productName과 recommendReason 속 제품 지칭에 함께 쓰이므로 여기서 한 번만 확정한다.
+     * @param names            LLM이 1단계에서 뽑은 제품명 목록
+     * @param productIds       프롬프트에 넣은 제품 id 목록 (촬영 순서)
+     * @param productMap       productId -> Product 매핑
+     * @return productId -> 제품명 (누락·공백이면 카테고리 한글명으로 대체)
+     * @throws IllegalArgumentException LLM이 요청에 없던 productId를 지어낸 경우
+     */
+    private Map<Long, String> resolveProductNames(
+            List<LlmProductNameDto> names,
+            List<Long> productIds,
+            Map<Long, Product> productMap
+    ) {
+        Map<Long, String> extracted = new HashMap<>();
+        for (LlmProductNameDto name : names == null ? List.<LlmProductNameDto>of() : names) {
+            if (!productMap.containsKey(name.productId())) {
+                throw new IllegalArgumentException("요청에 없는 productId: " + name.productId());
+            }
+            if (StringUtils.hasText(name.productName())) {
+                extracted.put(name.productId(), name.productName().strip());
+            }
+        }
+
+        // 제품명을 못 뽑았어도 화면에는 무언가 보여야 하므로 카테고리 한글명으로 대체한다. (id 노출 방지)
+        Map<Long, String> resolved = new HashMap<>();
+        for (Long productId : productIds) {
+            resolved.put(productId, extracted.getOrDefault(
+                    productId, productMap.get(productId).getCategory().getKorName()));
+        }
+        return resolved;
+    }
+
+    /**
+     * LLM 제품별 결과 -> 저장·응답 공용 DTO. LLM이 요청에 없던 id를 지어내면 거절한다.
+     * @param result       2단계 판단 결과
+     * @param productMap   productId -> Product 매핑
+     * @param productNames 1단계에서 확정한 productId -> 제품명
+     * @throws IllegalArgumentException 요청에 없던 productId인 경우
+     */
+    private AnalysisProductDto toProductDto(LlmProductAnalysisDto result,
+                                            Map<Long, Product> productMap, Map<Long, String> productNames) {
+        if (!productMap.containsKey(result.productId())) {
             throw new IllegalArgumentException("요청에 없는 productId: " + result.productId());
         }
 
-        product.applyAnalysis(analysis, result.productName(), result.recommended(), result.recommendReason());
+        return new AnalysisProductDto(
+                result.productId(),
+                productNames.get(result.productId()),
+                result.recommended(),
+                resolveReason(result));
+    }
+
+    // 이유 문구가 비어 오면 판단에 맞는 기본 문구로 채운다. (null·빈 문자열이 화면에 그대로 나가지 않게)
+    private String resolveReason(LlmProductAnalysisDto result) {
+        if (StringUtils.hasText(result.recommendReason())) {
+            return result.recommendReason().strip();
+        }
+        return result.recommended() == RecommendStatus.REMOVE ? DEFAULT_REMOVE_REASON : DEFAULT_KEEP_REASON;
+    }
+
+    // 제품명이 비어 있으면 카테고리 한글명으로 대체한다. (제품명 없이 저장된 예전 데이터 방어)
+    private String displayName(Product product) {
+        return StringUtils.hasText(product.getProductName())
+                ? product.getProductName()
+                : product.getCategory().getKorName();
+    }
+
+    // 결과 -> 같은 productId Product에 반영
+    private void applyToProduct(Analysis analysis, AnalysisProductDto product, Map<Long, Product> productMap) {
+        productMap.get(product.productId())
+                .applyAnalysis(analysis, product.productName(), product.recommended(), product.recommendReason());
     }
 }
