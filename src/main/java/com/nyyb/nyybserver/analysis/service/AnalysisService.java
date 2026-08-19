@@ -124,13 +124,38 @@ public class AnalysisService {
      * 현재 로그인 유저(게스트/카카오 공통)의 분석 목록을 최신순으로 페이징 조회
      * @param userId   소유자 id
      * @param pageable page/size 페이징 정보
-     * @return id + title 목록
+     * @return id + title + 제품 수 + REMOVE 제안 수 목록
      */
     @Transactional(readOnly = true)
     public List<AnalysisSummaryDto> getAnalyses(Long userId, Pageable pageable) {
-        return analysisRepository.findByUserIdOrderByCreatedAtDescIdDesc(userId, pageable).stream()
-                .map(AnalysisSummaryDto::from)
+        List<Analysis> analyses = analysisRepository.findByUserIdOrderByCreatedAtDescIdDesc(userId, pageable);
+        Map<UUID, List<ProductRepository.RecommendCount>> countsByAnalysisId = summarizeProductCounts(analyses);
+
+        return analyses.stream()
+                .map(analysis -> {
+                    List<ProductRepository.RecommendCount> counts =
+                            countsByAnalysisId.getOrDefault(analysis.getId(), List.of());
+                    long productCount = counts.stream()
+                            .mapToLong(ProductRepository.RecommendCount::getCount)
+                            .sum();
+                    long removeCount = counts.stream()
+                            .filter(count -> count.getRecommended() == RecommendStatus.REMOVE)
+                            .mapToLong(ProductRepository.RecommendCount::getCount)
+                            .sum();
+                    return AnalysisSummaryDto.from(analysis, productCount, removeCount);
+                })
                 .toList();
+    }
+
+    // 분석 목록의 productId를 한 번에 집계 조회해 analysisId별로 그룹핑 (N+1 방지)
+    private Map<UUID, List<ProductRepository.RecommendCount>> summarizeProductCounts(List<Analysis> analyses) {
+        if (analyses.isEmpty()) {
+            return Map.of();
+        }
+
+        List<UUID> analysisIds = analyses.stream().map(Analysis::getId).toList();
+        return productRepository.countGroupByAnalysisIdAndRecommended(analysisIds).stream()
+                .collect(Collectors.groupingBy(ProductRepository.RecommendCount::getAnalysisId));
     }
 
     /**

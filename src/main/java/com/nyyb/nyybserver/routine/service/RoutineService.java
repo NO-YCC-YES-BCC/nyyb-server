@@ -214,13 +214,30 @@ public class RoutineService {
      * 현재 로그인 유저(게스트/카카오 공통)의 루틴 목록을 최신순으로 페이징 조회
      * @param userId   소유자 id
      * @param pageable page/size 페이징 정보
-     * @return id + title 목록
+     * @return id + title + REMOVE 추천 수 목록
      */
     @Transactional(readOnly = true)
     public List<RoutineSummaryDto> getRoutines(Long userId, Pageable pageable) {
-        return routineRepository.findByUserIdOrderByCreatedAtDescIdDesc(userId, pageable).stream()
-                .map(RoutineSummaryDto::from)
+        List<Routine> routines = routineRepository.findByUserIdOrderByCreatedAtDescIdDesc(userId, pageable);
+        Map<UUID, Long> removeCountByRoutineId = summarizeRemoveCounts(routines);
+
+        return routines.stream()
+                .map(routine -> RoutineSummaryDto.from(routine, removeCountByRoutineId.getOrDefault(routine.getId(), 0L)))
                 .toList();
+    }
+
+    // 루틴 목록의 routineId를 한 번에 집계 조회해 REMOVE 추천 수만 뽑아 매핑 (N+1 방지)
+    private Map<UUID, Long> summarizeRemoveCounts(List<Routine> routines) {
+        if (routines.isEmpty()) {
+            return Map.of();
+        }
+
+        List<UUID> routineIds = routines.stream().map(Routine::getId).toList();
+        return routineItemRepository.countGroupByRoutineIdAndRecommended(routineIds).stream()
+                .filter(count -> count.getRecommended() == RecommendStatus.REMOVE)
+                .collect(Collectors.toMap(
+                        RoutineItemRepository.RecommendCount::getRoutineId,
+                        RoutineItemRepository.RecommendCount::getCount));
     }
 
     // 요청 슬롯(daySlot) 기준으로 제품을 DTO로 가공.
