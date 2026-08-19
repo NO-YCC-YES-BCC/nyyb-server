@@ -14,7 +14,7 @@ import com.nyyb.nyybserver.analysis.data.repository.ProductIngredientRepository;
 import com.nyyb.nyybserver.analysis.data.repository.ProductRepository;
 import com.nyyb.nyybserver.ingredient.data.dto.response.AllergicDto;
 import com.nyyb.nyybserver.ingredient.data.dto.response.IngredientDto;
-import com.nyyb.nyybserver.ingredient.data.dto.response.IngredientMatchResponseDto;
+import com.nyyb.nyybserver.ingredient.data.dto.response.ProductIngredientMatchDto;
 import com.nyyb.nyybserver.ingredient.data.entity.Ingredient;
 import com.nyyb.nyybserver.ingredient.data.enums.RiskLevel;
 import com.nyyb.nyybserver.ingredient.service.IngredientService;
@@ -122,7 +122,9 @@ class CompatibilityServiceTest {
                 )
         );
 
-        IngredientMatchResponseDto ingredientMatch = new IngredientMatchResponseDto(
+        ProductIngredientMatchDto ingredientMatch = new ProductIngredientMatchDto(
+                candidate.getId(),
+                "테스트 세럼",
                 List.of(new IngredientDto(limonene.getId(), limonene.getName(), false, RiskLevel.LOW, null)),
                 List.of(new AllergicDto(1L, limonene.getName(), "식품의약품안전처 고시"))
         );
@@ -137,7 +139,7 @@ class CompatibilityServiceTest {
                 .thenReturn(List.of(keptItem, removedItem));
         when(productIngredientRepository.findByProductIdWithIngredient(keptProduct.getId()))
                 .thenReturn(List.of(keptIngredient));
-        when(ingredientService.match(List.of(candidate.getId()))).thenReturn(ingredientMatch);
+        when(ingredientService.match(candidate.getId())).thenReturn(ingredientMatch);
         when(compatibilityAnalyzer.analyze(anyString())).thenReturn(llmResponse);
 
         CompatibilityRequestDto request = new CompatibilityRequestDto();
