@@ -211,7 +211,7 @@ public class CompatibilityService {
         StringBuilder message = new StringBuilder();
         message.append("=== 새 제품 ===\n")
                 .append("productId: ").append(candidate.getId()).append('\n')
-                .append("category: ").append(candidate.getCategory()).append('\n')
+                .append("category: ").append(candidate.getCategory().describe()).append('\n')
                 .append("ocrText:\n<ocr-data>\n")
                 .append(candidate.getOcrText() == null ? "" : candidate.getOcrText())
                 .append("\n</ocr-data>\n")
@@ -225,7 +225,7 @@ public class CompatibilityService {
             message.append("--- 기존 루틴 제품 ---\n")
                     .append("productId: ").append(product.getId()).append('\n')
                     .append("productName: ").append(displayName(product)).append('\n')
-                    .append("category: ").append(product.getCategory()).append('\n')
+                    .append("category: ").append(product.getCategory().describe()).append('\n')
                     .append("activeSlots: ").append(formatSlots(context.slots())).append('\n')
                     .append("ingredients:").append(formatIngredients(context.ingredients()))
                     .append("\n\n");
