@@ -11,12 +11,14 @@ public record IngredientDto(
         String description
 ) {
     public static IngredientDto from(Ingredient ingredient) {
+        RiskLevel riskLevel = ingredient.getRiskLevel();
         return new IngredientDto(
                 ingredient.getId(),
                 ingredient.getName(),
                 ingredient.getIsToxic(),
-                ingredient.getRiskLevel(),
-                ingredient.getDescription()
+                riskLevel,
+                // 성분 테이블의 description이 아닌 RiskLevel별 고정 문구를 내려준다
+                riskLevel == null ? null : riskLevel.getDescription()
         );
     }
 }
