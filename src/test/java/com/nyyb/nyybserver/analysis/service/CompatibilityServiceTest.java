@@ -126,7 +126,8 @@ class CompatibilityServiceTest {
                 candidate.getId(),
                 "테스트 세럼",
                 List.of(new IngredientDto(limonene.getId(), limonene.getName(), false, RiskLevel.LOW, null)),
-                List.of(new AllergicDto(1L, limonene.getName(), "식품의약품안전처 고시"))
+                List.of(new AllergicDto(1L, limonene.getName(), "식품의약품안전처 고시",
+                        "식품의약품안전처 자료에 근거해 알레르기 유발성분으로 지정된 성분이에요."))
         );
 
         when(routineRepository.findByIdAndUserId(routineId, userId))
