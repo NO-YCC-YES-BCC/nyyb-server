@@ -11,7 +11,7 @@ import com.nyyb.nyybserver.analysis.data.enums.RoutineSlot;
 import com.nyyb.nyybserver.analysis.data.exception.ProductNotFoundException;
 import com.nyyb.nyybserver.analysis.data.repository.ProductIngredientRepository;
 import com.nyyb.nyybserver.analysis.data.repository.ProductRepository;
-import com.nyyb.nyybserver.ingredient.data.dto.response.IngredientMatchResponseDto;
+import com.nyyb.nyybserver.ingredient.data.dto.response.ProductIngredientMatchDto;
 import com.nyyb.nyybserver.ingredient.data.entity.Ingredient;
 import com.nyyb.nyybserver.ingredient.service.IngredientService;
 import com.nyyb.nyybserver.routine.data.entity.Routine;
@@ -66,8 +66,7 @@ public class CompatibilityService {
         List<RoutineProductContext> currentProducts = currentProducts(routineItems);
 
         // 알레르기·유해성분 매칭은 ingredient match API와 동일한 로직 사용 (요청받은 productId 기준)
-        IngredientMatchResponseDto ingredientMatch =
-                ingredientService.match(List.of(candidate.getId()));
+        ProductIngredientMatchDto ingredientMatch = ingredientService.match(candidate.getId());
 
         if (currentProducts.isEmpty() || !hasCandidateData(candidate, candidateIngredients)) {
             return unknownResponse(candidate, ingredientMatch);
@@ -129,7 +128,7 @@ public class CompatibilityService {
 
     private CompatibilityResponseDto unknownResponse(
             Product candidate,
-            IngredientMatchResponseDto ingredientMatch
+            ProductIngredientMatchDto ingredientMatch
     ) {
         return new CompatibilityResponseDto(
                 candidate.getId(),
@@ -146,7 +145,7 @@ public class CompatibilityService {
             List<ProductIngredient> candidateIngredients,
             List<RoutineProductContext> currentProducts,
             LlmCompatibilityResponseDto analysis,
-            IngredientMatchResponseDto ingredientMatch
+            ProductIngredientMatchDto ingredientMatch
     ) {
         CompatibilityStatus status = analysis.status() == null
                 ? CompatibilityStatus.UNKNOWN
