@@ -1,9 +1,10 @@
 package com.nyyb.nyybserver.mypage.service;
 
+import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 import com.nyyb.nyybserver.analysis.data.repository.AnalysisRepository;
 import com.nyyb.nyybserver.mypage.data.dto.response.MyPageResponseDto;
-import com.nyyb.nyybserver.routine.data.entity.Routine;
 import com.nyyb.nyybserver.routine.data.repository.RoutineItemRepository;
+import com.nyyb.nyybserver.routine.data.repository.RoutineItemSelectionRepository;
 import com.nyyb.nyybserver.routine.data.repository.RoutineRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +18,7 @@ public class MyPageService {
 
     private final RoutineRepository routineRepository;
     private final RoutineItemRepository routineItemRepository;
+    private final RoutineItemSelectionRepository routineItemSelectionRepository;
     private final AnalysisRepository analysisRepository;
 
     /**
@@ -32,17 +34,13 @@ public class MyPageService {
         return routineRepository.findFirstByUserIdOrderByCreatedAtDescIdDesc(userId)
                 .map(routine -> new MyPageResponseDto(
                         routineItemRepository.countByRoutineId(routine.getId()),
-                        countRemoved(routine),
+                        // 덜어낸 제품 = 유저가 한 슬롯이라도 REMOVE로 저장한 제품 수.
+                        // beforeCount - afterCount 방식은 afterCount가 슬롯 레코드 단위(BOTH 제품은 2)라
+                        // 제품 수와 단위가 어긋나 실제 제외 수보다 적게 나오는 문제가 있었다.
+                        routineItemSelectionRepository.countDistinctItemsByRoutineIdAndAction(
+                                routine.getId(), RecommendStatus.REMOVE),
                         analysisCount
                 ))
                 .orElseGet(() -> new MyPageResponseDto(0, 0, analysisCount));
-    }
-
-    // 덜어낸 제품 = 분석 전 제품 개수 - 유저가 유지 선택한 개수.
-    // 아직 저장 전이라 afterCount가 없으면 덜어낸 제품이 없는 것으로 보고, 음수는 0으로 막는다.
-    private long countRemoved(Routine routine) {
-        int before = routine.getBeforeCount() != null ? routine.getBeforeCount() : 0;
-        int after = routine.getAfterCount() != null ? routine.getAfterCount() : before;
-        return Math.max(0, before - after);
     }
 }
