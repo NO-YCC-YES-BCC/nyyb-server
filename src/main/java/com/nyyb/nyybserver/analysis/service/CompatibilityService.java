@@ -174,11 +174,20 @@ public class CompatibilityService {
         for (RoutineProductContext context : currentProducts) {
             List<String> overlapping = overlappingIngredients(candidateIngredients, context.ingredients());
             if (!overlapping.isEmpty()) {
-                lines.add("제품 " + context.product().getId() + "번과 " + overlapping.size() + "개 성분 중복");
+                lines.add(joinWithParticle(displayName(context.product()))
+                        + " " + overlapping.size() + "개 성분 중복");
             }
         }
         lines.add(summary);
         return String.join("\n", lines);
+    }
+
+    // 이름 끝 글자의 받침 유무에 따라 '와/과'를 붙인다. 한글이 아니면 '와'.
+    // 프론트가 "…와|과 N개 성분 중복" 패턴으로 파싱하므로 접속조사는 반드시 와/과 중 하나여야 한다.
+    private String joinWithParticle(String name) {
+        char last = name.charAt(name.length() - 1);
+        boolean hasJongseong = last >= 0xAC00 && last <= 0xD7A3 && (last - 0xAC00) % 28 != 0;
+        return name + (hasJongseong ? "과" : "와");
     }
 
     private List<String> overlappingIngredients(
