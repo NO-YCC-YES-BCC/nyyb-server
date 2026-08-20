@@ -251,10 +251,14 @@ public class RoutineService {
         boolean isRemove = item.getRecommended() == RecommendStatus.REMOVE;
         boolean removeInThisDay = isRemove && matchesDay(item.getLlmRoutineSlot(), daySlot);
 
-        RecommendStatus recommended = removeInThisDay ? RecommendStatus.REMOVE : RecommendStatus.KEEP;
-        String recommendReason = isRemove
-                ? (removeInThisDay ? item.getRecommendReason() : null) // 제외 제품: 제외가 적용되는 day에서만 이유 노출
-                : item.getRecommendReason();                           // 유지 제품: 항상 유지 이유 노출
+        // 유저가 저장한 선택이 있으면 LLM 추천보다 우선한다 (saveRoutine 이후 재조회 시 선택 상태 유지)
+        RecommendStatus userAction = item.getUserSelection(daySlot);
+        RecommendStatus recommended = userAction != null
+                ? userAction
+                : (removeInThisDay ? RecommendStatus.REMOVE : RecommendStatus.KEEP);
+        String recommendReason = recommended == RecommendStatus.REMOVE
+                ? (removeInThisDay ? item.getRecommendReason() : null) // 제외: LLM 제외 이유가 이 day에 해당할 때만 노출
+                : (isRemove ? null : item.getRecommendReason());       // 유지: 제외 이유는 배지와 어긋나므로 싣지 않음
 
         return new RoutineDayProductDto(
                 product.getId(),
@@ -307,10 +311,12 @@ public class RoutineService {
         return routine.getId();
     }
 
-    // 사용자가 고른 슬롯(userRoutineSlot)이 해당 시간대(또는 BOTH)인 제품만 골라 id + category + productName로 변환
+    // 사용자가 고른 슬롯(userRoutineSlot)이 해당 시간대(또는 BOTH)인 제품만 골라 id + category + productName로 변환.
+    // 유저가 saveRoutine으로 해당 슬롯에서 REMOVE를 저장한 제품은 정리된 루틴에서 빠진다.
     private List<RoutineProductDto> filterByUserSlot(List<RoutineItem> items, RoutineSlot slot) {
         return items.stream()
                 .filter(item -> matchesDay(item.getUserRoutineSlot(), slot))
+                .filter(item -> item.getUserSelection(slot) != RecommendStatus.REMOVE)
                 .map(item -> {
                     Product product = item.getProduct();
                     return new RoutineProductDto(product.getId(), product.getCategory(), product.getProductName());

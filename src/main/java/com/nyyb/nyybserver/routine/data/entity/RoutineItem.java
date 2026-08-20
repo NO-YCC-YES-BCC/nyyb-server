@@ -84,4 +84,17 @@ public class RoutineItem {
                 .action(action)
                 .build());
     }
+
+    /**
+     * 해당 슬롯에 대해 유저가 저장한 선택(KEEP/REMOVE)을 반환. 저장 전이면 null.
+     * 조회 API가 LLM 추천 대신 유저 선택을 우선 반영할 때 사용한다.
+     */
+    public RecommendStatus getUserSelection(RoutineSlot slot) {
+        for (RoutineItemSelection selection : selections) {
+            if (selection.getSlot() == slot) {
+                return selection.getAction();
+            }
+        }
+        return null;
+    }
 }
