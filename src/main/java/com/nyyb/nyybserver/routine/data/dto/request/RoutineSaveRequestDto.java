@@ -5,6 +5,7 @@ import com.nyyb.nyybserver.analysis.data.enums.RoutineSlot;
 import lombok.Data;
 
 import java.util.List;
+import java.util.UUID;
 
 @Data
 public class RoutineSaveRequestDto {
@@ -14,7 +15,7 @@ public class RoutineSaveRequestDto {
 
     @Data
     public static class ProductSelection {
-        private Long id;             // productId
+        private UUID id;             // userProductId
         private RoutineSlot slot;    // MORNING / EVENING (해당 화면의 슬롯)
         private RecommendStatus action; // KEEP / REMOVE
     }

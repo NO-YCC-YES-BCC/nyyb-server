@@ -10,6 +10,7 @@ public record ProductIngredientMappingDto(
         Long productId,
         String itemName,
         boolean found,          // LLM이 전성분 근거를 찾았는지
+        boolean alreadyMapped,  // 이미 매핑돼 있어 LLM 조회를 건너뛴 경우 true
         String source,          // LLM이 근거로 삼은 출처
         int totalCount,         // LLM이 돌려준 성분 수
         int matchedCount,       // 성분 마스터에 매칭된 수

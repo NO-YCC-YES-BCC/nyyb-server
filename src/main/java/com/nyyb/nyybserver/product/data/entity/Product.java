@@ -22,10 +22,12 @@ import java.time.Instant;
 @Table(name = "product")
 public class Product {
 
+    private static final String UNCLASSIFIED = "미분류";
+
     // 화장품보고일련번호. 식약처가 부여한 값이라 애플리케이션이 생성하지 않는다.
     @Id
-    @Column(name = "COSMETIC_REPORT_SEQ", nullable = false)
-    private Long cosmeticReportSeq;
+    @Column(nullable = false)
+    private Long id;
 
     @Column(name = "ITEM_NAME", length = 1000)
     private String itemName; // 품목명
@@ -83,6 +85,15 @@ public class Product {
     // DB가 current_timestamp로 채우고 갱신한다.
     @Column(name = "updated_at", insertable = false, updatable = false)
     private Instant updatedAt;
+
+    // 분류가 없는 행(19.5만 건 중 1만여 건)이 있어 라벨을 뽑는 곳마다 방어하지 않도록 여기서 처리한다.
+    public String getCategoryMainLabel() {
+        return categoryMain == null ? UNCLASSIFIED : categoryMain.getDbValue();
+    }
+
+    public String getCategorySubLabel() {
+        return categorySub == null ? UNCLASSIFIED : categorySub.getDbValue();
+    }
 
     // Y/N 문자열 컬럼은 값이 없을 수 있어(NULL) 없으면 false로 본다.
     public boolean isEthanolOver() {

@@ -68,7 +68,7 @@ public class ProductService {
      * 품목명을 LLM에 넘겨 웹에서 전성분을 찾아오게 하고, 받은 성분 표기를 성분 마스터와 매칭해 저장한다.
      * 매칭은 {@link IngredientIndex}가 성분 대표명과 이명(ingredient_alias)을 같은 인덱스에 올려두므로
      * "Ascorbic Acid" 같은 이명 표기도 대표 성분으로 걸린다. 마스터에 없으면 저장하지 않고 unmatched로 돌려준다.
-     * 같은 제품으로 다시 호출하면 기존 매핑을 지우고 새로 쓴다.
+     * 이미 매핑된 전성분이 있으면 LLM을 호출하지 않고 저장돼 있던 매핑을 그대로 돌려준다.
      *
      * @throws ProductNotFoundException 해당 id의 제품이 없는 경우
      */
@@ -76,6 +76,14 @@ public class ProductService {
     public ProductIngredientMappingDto mapIngredientsFromWeb(Long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(ProductNotFoundException::new);
+
+        // 이미 매핑된 전성분이 있으면 다시 조회하지 않는다.
+        // 웹서치 호출 1건이 1.7만 토큰 규모라 재호출 비용이 크고, 전성분은 자주 바뀌지 않는다.
+        List<ProductIngredient> existing = productIngredientRepository.findByProductIdWithIngredient(productId);
+        if (!existing.isEmpty()) {
+            log.info("이미 매핑된 전성분이 있어 조회를 건너뜁니다. productId={}, count={}", productId, existing.size());
+            return alreadyMapped(product, existing);
+        }
 
         String itemName = product.getItemName();
         if (!StringUtils.hasText(itemName)) {
@@ -114,7 +122,6 @@ public class ProductService {
             rawNames.putIfAbsent(ingredient.getId(), rawName);
         }
 
-        productIngredientRepository.deleteByProductId(productId);
         productIngredientRepository.saveAll(matched.values());
 
         List<ProductIngredientMappingDto.MatchedIngredient> matchedIngredients = matched.values().stream()
@@ -125,7 +132,7 @@ public class ProductService {
                 .toList();
 
         return new ProductIngredientMappingDto(
-                productId, itemName, true, found.source(),
+                productId, itemName, true, false, found.source(),
                 found.ingredients().size(), matchedIngredients.size(), matchedIngredients, unmatched);
     }
 
@@ -141,7 +148,22 @@ public class ProductService {
 
     private ProductIngredientMappingDto emptyMapping(Long productId, String itemName) {
         return new ProductIngredientMappingDto(
-                productId, itemName, false, "", 0, 0, List.of(), List.of());
+                productId, itemName, false, false, "", 0, 0, List.of(), List.of());
+    }
+
+    // 이미 저장돼 있던 매핑을 그대로 돌려준다. (LLM 호출 없음)
+    private ProductIngredientMappingDto alreadyMapped(Product product, List<ProductIngredient> existing) {
+        List<ProductIngredientMappingDto.MatchedIngredient> matched = existing.stream()
+                .filter(pi -> pi.getIngredient() != null)
+                .map(pi -> new ProductIngredientMappingDto.MatchedIngredient(
+                        pi.getIngredient().getId(),
+                        pi.getIngredient().getName(),
+                        pi.getRawName()))
+                .toList();
+
+        return new ProductIngredientMappingDto(
+                product.getId(), product.getItemName(), true, true, "",
+                existing.size(), matched.size(), matched, List.of());
     }
 
     private List<String> tokenize(String keyword) {

@@ -5,9 +5,11 @@ import com.nyyb.nyybserver.analysis.data.dto.response.CompatibilityResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmCompatibilityIssueDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmCompatibilityResponseDto;
 import com.nyyb.nyybserver.product.data.entity.Product;
+import com.nyyb.nyybserver.product.data.entity.UserProduct;
+import com.nyyb.nyybserver.product.data.enums.CategoryMain;
+import com.nyyb.nyybserver.product.data.enums.CategorySub;
 import com.nyyb.nyybserver.product.data.entity.ProductIngredient;
 import com.nyyb.nyybserver.analysis.data.enums.CompatibilityStatus;
-import com.nyyb.nyybserver.product.data.enums.ProductCategory;
 import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 import com.nyyb.nyybserver.analysis.data.enums.RoutineSlot;
 import com.nyyb.nyybserver.product.data.repository.ProductIngredientRepository;
@@ -74,9 +76,9 @@ class CompatibilityServiceTest {
         UUID routineId = UUID.randomUUID();
 
         Routine routine = Routine.builder().id(routineId).title("현재 루틴").build();
-        Product candidate = product(200L, "새 제품 성분표", null);
-        Product keptProduct = product(101L, "나이아신아마이드, 글리세린", "기존 세럼");
-        Product removedProduct = product(102L, "레티놀", "제거한 크림");
+        Product candidate = product(200L, "테스트 세럼");
+        Product keptProduct = product(101L, "기존 세럼");
+        Product removedProduct = product(102L, "제거한 크림");
 
         RoutineItem keptItem = routineItem(
                 routine,
@@ -132,7 +134,7 @@ class CompatibilityServiceTest {
 
         when(routineRepository.findByIdAndUserId(routineId, userId))
                 .thenReturn(Optional.of(routine));
-        when(productRepository.findByIdAndUserId(candidate.getId(), userId))
+        when(productRepository.findById(candidate.getId()))
                 .thenReturn(Optional.of(candidate));
         when(productIngredientRepository.findByProductIdWithIngredient(candidate.getId()))
                 .thenReturn(List.of(candidateIngredient));
@@ -153,11 +155,11 @@ class CompatibilityServiceTest {
         assertEquals("테스트 세럼", response.productName());
         assertEquals(RecommendStatus.REMOVE, response.recommended());
         assertEquals(
-                "제품 " + keptProduct.getId() + "번과 1개 성분 중복\n"
+                keptProduct.getItemName() + "과 1개 성분 중복\n"
                         + "현재 루틴과 겹치는 구성이 있어 사용 시간대를 나누는 방법을 고려해볼 수 있어요.",
                 response.recommendReason()
         );
-        assertFalse(response.recommendReason().contains("제품 " + removedProduct.getId() + "번과"));
+        assertFalse(response.recommendReason().contains(removedProduct.getItemName()));
         assertEquals(ingredientMatch.ingredients(), response.ingredients());
         assertEquals(ingredientMatch.allergics(), response.allergics());
 
@@ -180,16 +182,22 @@ class CompatibilityServiceTest {
         assertThrows(RoutineNotFoundException.class,
                 () -> compatibilityService.compare(request, userId));
 
-        verify(productRepository, never()).findByIdAndUserId(request.getProductId(), userId);
+        verify(productRepository, never()).findById(request.getProductId());
     }
 
-    private Product product(Long id, String ocrText, String productName) {
+    private Product product(Long id, String productName) {
         return Product.builder()
                 .id(id)
-                .imageKey("analysis/" + id + ".jpg")
-                .category(ProductCategory.SERUM)
-                .productName(productName)
-                .ocrText(ocrText)
+                .itemName(productName)
+                .categoryMain(CategoryMain.SKIN_CARE)
+                .categorySub(CategorySub.SERUM)
+                .build();
+    }
+
+    private UserProduct userProduct(Product product) {
+        return UserProduct.builder()
+                .id(UUID.randomUUID())
+                .product(product)
                 .build();
     }
 
@@ -201,7 +209,7 @@ class CompatibilityServiceTest {
     ) {
         return RoutineItem.builder()
                 .routine(routine)
-                .product(product)
+                .userProduct(userProduct(product))
                 .userRoutineSlot(RoutineSlot.MORNING)
                 .llmRoutineSlot(RoutineSlot.MORNING)
                 .recommended(recommended)

@@ -1,6 +1,7 @@
 package com.nyyb.nyybserver.routine.service;
 
 import com.nyyb.nyybserver.product.data.entity.Product;
+import com.nyyb.nyybserver.product.data.entity.UserProduct;
 import com.nyyb.nyybserver.product.data.entity.ProductIngredient;
 import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 import com.nyyb.nyybserver.analysis.data.enums.RoutineSlot;
@@ -66,7 +67,7 @@ public class RoutineService {
             throw new IllegalArgumentException("해당 routineId의 루틴 아이템이 없습니다: " + routineId);
         }
 
-        List<Product> products = items.stream().map(RoutineItem::getProduct).toList();
+        List<UserProduct> products = items.stream().map(RoutineItem::getUserProduct).toList();
 
         String userMessage = buildUserMessage(products);
         log.info("OpenAI 루틴 요청 메시지:\n{}", userMessage);
@@ -85,7 +86,7 @@ public class RoutineService {
 
         // productId -> RoutineItem 매핑 후 LLM 슬롯/추천 반영
         Map<Long, RoutineItem> itemMap = items.stream()
-                .collect(Collectors.toMap(item -> item.getProduct().getId(), Function.identity()));
+                .collect(Collectors.toMap(item -> item.getUserProduct().getProduct().getId(), Function.identity()));
 
         for (LlmRoutineItemDto dto : llmResponse.items()) {
             RoutineItem item = itemMap.get(dto.productId());
@@ -246,7 +247,8 @@ public class RoutineService {
     // - 제외(REMOVE) 제품: LLM 추천 슬롯이 이 day를 커버(daySlot 또는 BOTH)할 때만 REMOVE + 제외 이유를 노출하고,
     //   커버하지 않는 day에서는 KEEP으로 낮추며, 제외 이유는 배지와 어긋나므로 싣지 않는다.
     private RoutineDayProductDto toDayProduct(RoutineItem item, RoutineSlot daySlot) {
-        Product product = item.getProduct();
+        UserProduct userProduct = item.getUserProduct();
+        Product product = userProduct.getProduct();
 
         boolean isRemove = item.getRecommended() == RecommendStatus.REMOVE;
         boolean removeInThisDay = isRemove && matchesDay(item.getLlmRoutineSlot(), daySlot);
@@ -261,9 +263,10 @@ public class RoutineService {
                 : (isRemove ? null : item.getRecommendReason());       // 유지: 제외 이유는 배지와 어긋나므로 싣지 않음
 
         return new RoutineDayProductDto(
-                product.getId(),
-                product.getCategory(),
-                product.getProductName(),
+                userProduct.getId(),
+                product.getCategoryMainLabel(),
+                product.getCategorySubLabel(),
+                product.getItemName(),
                 recommended,
                 recommendReason
         );
@@ -291,13 +294,13 @@ public class RoutineService {
                 .orElseThrow(RoutineNotFoundException::new);
 
         List<RoutineItem> items = routineItemRepository.findByRoutineIdWithProduct(routineId);
-        Map<Long, RoutineItem> itemMap = items.stream()
-                .collect(Collectors.toMap(item -> item.getProduct().getId(), Function.identity()));
+        Map<UUID, RoutineItem> itemMap = items.stream()
+                .collect(Collectors.toMap(item -> item.getUserProduct().getId(), Function.identity()));
 
         for (RoutineSaveRequestDto.ProductSelection ps : request.getProducts()) {
             RoutineItem item = itemMap.get(ps.getId());
             if (item == null) {
-                throw new IllegalArgumentException("루틴에 없는 productId: " + ps.getId());
+                throw new IllegalArgumentException("루틴에 없는 userProductId: " + ps.getId());
             }
             item.applyUserSelection(ps.getSlot(), ps.getAction());
         }
@@ -318,23 +321,30 @@ public class RoutineService {
                 .filter(item -> matchesDay(item.getUserRoutineSlot(), slot))
                 .filter(item -> item.getUserSelection(slot) != RecommendStatus.REMOVE)
                 .map(item -> {
-                    Product product = item.getProduct();
-                    return new RoutineProductDto(product.getId(), product.getCategory(), product.getProductName());
+                    Product product = item.getUserProduct().getProduct();
+                    return new RoutineProductDto(
+                            item.getUserProduct().getId(),
+                            product.getCategoryMainLabel(),
+                            product.getCategorySubLabel(),
+                            product.getItemName());
                 })
                 .toList();
     }
 
-    // 제품별 productId + productName + recommended + recommendReason + 성분 -> 프롬프트 텍스트로 조립
-    private String buildUserMessage(List<Product> products) {
+    // 제품별 productId + productName + 카테고리 + recommended + recommendReason + 성분 -> 프롬프트 텍스트로 조립
+    // productId는 사용자 제품 id(UUID)가 아니라 마스터 카탈로그 id를 넣는다. (모델이 그대로 복사하기 쉬운 숫자)
+    private String buildUserMessage(List<UserProduct> userProducts) {
         StringBuilder sb = new StringBuilder();
         sb.append("다음 제품들로 스킨케어 루틴을 설계해 주세요.\n\n");
 
-        for (Product product : products) {
+        for (UserProduct userProduct : userProducts) {
+            Product product = userProduct.getProduct();
             sb.append("=== productId: ").append(product.getId()).append(" ===\n");
-            sb.append("productName: ").append(product.getProductName()).append("\n");
-            sb.append("category: ").append(product.getCategory().describe()).append("\n");
-            sb.append("recommended: ").append(product.getRecommended()).append("\n");
-            sb.append("recommendReason: ").append(product.getRecommendReason()).append("\n");
+            sb.append("productName: ").append(product.getItemName()).append("\n");
+            sb.append("categoryMain: ").append(product.getCategoryMainLabel()).append("\n");
+            sb.append("categorySub: ").append(product.getCategorySubLabel()).append("\n");
+            sb.append("recommended: ").append(userProduct.getRecommended()).append("\n");
+            sb.append("recommendReason: ").append(userProduct.getRecommendReason()).append("\n");
             sb.append("ingredients: ").append(formatIngredients(product.getId())).append("\n\n");
         }
 

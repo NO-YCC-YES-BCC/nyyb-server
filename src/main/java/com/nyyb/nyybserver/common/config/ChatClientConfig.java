@@ -6,7 +6,10 @@ import com.nyyb.nyybserver.product.data.dto.response.LlmProductIngredientsDto;
 import com.nyyb.nyybserver.routine.data.dto.response.LlmRoutineResponseDto;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.converter.BeanOutputConverter;
+import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.OpenAiApi.ChatCompletionRequest.WebSearchOptions;
+import org.springframework.ai.openai.api.OpenAiApi.ChatCompletionRequest.WebSearchOptions.SearchContextSize;
 import org.springframework.ai.openai.api.ResponseFormat;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -27,6 +30,10 @@ public class ChatClientConfig {
 
     @Value("classpath:prompts/product-ingredient-system-prompt.st")
     private Resource productIngredientSystemPrompt;
+
+    // 웹서치를 지원하는 모델만 web_search_options를 받는다. (기본 채팅 모델과 별개)
+    @Value("${openai.product-ingredient.model:gpt-5-search-api}")
+    private String productIngredientModel;
 
     // 빈 이름(chatClient / routineChatClient)을 주입 필드명과 맞춰 구분 주입한다.
     @Bean
@@ -53,11 +60,25 @@ public class ChatClientConfig {
                 .build();
     }
 
+    /**
+     * 전성분 조회 전용 클라이언트. OpenAI 내장 웹서치를 켜서 모델이 직접 검색·인용하게 한다.
+     * 웹서치 모델은 temperature 같은 옵션을 받지 않으므로, ChatClient에 옵션을 얹는 대신
+     * 모델의 기본 옵션 자체를 갈아끼워 application.yml 기본값이 섞여 들어가지 않게 한다.
+     */
     @Bean
-    public ChatClient productIngredientChatClient(ChatClient.Builder builder) {
-        return builder
+    public ChatClient productIngredientChatClient(OpenAiChatModel openAiChatModel) {
+        OpenAiChatOptions options = OpenAiChatOptions.builder()
+                .model(productIngredientModel)
+                .webSearchOptions(new WebSearchOptions(SearchContextSize.MEDIUM, null))
+                .responseFormat(strictJsonSchema("product_ingredients", LlmProductIngredientsDto.class))
+                .build();
+
+        OpenAiChatModel searchModel = openAiChatModel.mutate()
+                .defaultOptions(options)
+                .build();
+
+        return ChatClient.builder(searchModel)
                 .defaultSystem(productIngredientSystemPrompt)
-                .defaultOptions(strictJsonOptions("product_ingredients", LlmProductIngredientsDto.class))
                 .build();
     }
 
@@ -70,17 +91,19 @@ public class ChatClientConfig {
      * @param responseType 구조화 출력으로 받을 응답 DTO 타입
      */
     private OpenAiChatOptions strictJsonOptions(String name, Class<?> responseType) {
-        ResponseFormat responseFormat = ResponseFormat.builder()
+        return OpenAiChatOptions.builder()
+                .responseFormat(strictJsonSchema(name, responseType))
+                .build();
+    }
+
+    private ResponseFormat strictJsonSchema(String name, Class<?> responseType) {
+        return ResponseFormat.builder()
                 .type(ResponseFormat.Type.JSON_SCHEMA)
                 .jsonSchema(ResponseFormat.JsonSchema.builder()
                         .name(name)
                         .schema(new BeanOutputConverter<>(responseType).getJsonSchemaMap())
                         .strict(true)
                         .build())
-                .build();
-
-        return OpenAiChatOptions.builder()
-                .responseFormat(responseFormat)
                 .build();
     }
 }

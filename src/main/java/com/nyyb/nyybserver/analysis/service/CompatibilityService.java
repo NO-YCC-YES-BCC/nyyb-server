@@ -56,7 +56,7 @@ public class CompatibilityService {
     public CompatibilityResponseDto compare(CompatibilityRequestDto request, Long userId) {
         Routine routine = routineRepository.findByIdAndUserId(request.getRoutineId(), userId)
                 .orElseThrow(RoutineNotFoundException::new);
-        Product candidate = productRepository.findByIdAndUserId(request.getProductId(), userId)
+        Product candidate = productRepository.findById(request.getProductId())
                 .orElseThrow(ProductNotFoundException::new);
 
         List<ProductIngredient> candidateIngredients =
@@ -93,10 +93,11 @@ public class CompatibilityService {
                     .toList();
 
             if (!activeSlots.isEmpty()) {
+                Product routineProduct = item.getUserProduct().getProduct();
                 products.add(new RoutineProductContext(
-                        item.getProduct(),
+                        routineProduct,
                         activeSlots,
-                        productIngredientRepository.findByProductIdWithIngredient(item.getProduct().getId())
+                        productIngredientRepository.findByProductIdWithIngredient(routineProduct.getId())
                 ));
             }
         }
@@ -132,7 +133,7 @@ public class CompatibilityService {
     ) {
         return new CompatibilityResponseDto(
                 candidate.getId(),
-                "새 제품",
+                displayName(candidate),
                 RecommendStatus.KEEP,
                 UNKNOWN_SUMMARY + " " + UNKNOWN_GUIDE,
                 ingredientMatch.ingredients(),
@@ -219,7 +220,9 @@ public class CompatibilityService {
         StringBuilder message = new StringBuilder();
         message.append("=== 새 제품 ===\n")
                 .append("productId: ").append(candidate.getId()).append('\n')
-                .append("category: ").append(candidate.getCategory().describe()).append('\n')
+                .append("productName: ").append(displayName(candidate)).append('\n')
+                .append("categoryMain: ").append(candidate.getCategoryMainLabel()).append('\n')
+                .append("categorySub: ").append(candidate.getCategorySubLabel()).append('\n')
                 .append("matchedIngredients:")
                 .append(formatIngredients(candidateIngredients))
                 .append("\n\n=== 현재 루틴 ===\n")
@@ -230,7 +233,8 @@ public class CompatibilityService {
             message.append("--- 기존 루틴 제품 ---\n")
                     .append("productId: ").append(product.getId()).append('\n')
                     .append("productName: ").append(displayName(product)).append('\n')
-                    .append("category: ").append(product.getCategory().describe()).append('\n')
+                    .append("categoryMain: ").append(product.getCategoryMainLabel()).append('\n')
+                    .append("categorySub: ").append(product.getCategorySubLabel()).append('\n')
                     .append("activeSlots: ").append(formatSlots(context.slots())).append('\n')
                     .append("ingredients:").append(formatIngredients(context.ingredients()))
                     .append("\n\n");
@@ -279,9 +283,9 @@ public class CompatibilityService {
     }
 
     private String displayName(Product product) {
-        return StringUtils.hasText(product.getProductName())
-                ? product.getProductName()
-                : product.getCategory().name() + " " + product.getId();
+        return StringUtils.hasText(product.getItemName())
+                ? product.getItemName()
+                : product.getCategoryMainLabel() + " " + product.getId();
     }
 
     private String safeText(String value, String fallback) {

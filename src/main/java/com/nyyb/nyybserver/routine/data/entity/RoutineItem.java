@@ -1,6 +1,6 @@
 package com.nyyb.nyybserver.routine.data.entity;
 
-import com.nyyb.nyybserver.product.data.entity.Product;
+import com.nyyb.nyybserver.product.data.entity.UserProduct;
 import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 import com.nyyb.nyybserver.analysis.data.enums.RoutineSlot;
 import jakarta.persistence.*;
@@ -30,10 +30,10 @@ public class RoutineItem {
     @JoinColumn(name = "routine_id", nullable = false)
     private Routine routine;
 
-    // 제품 1 : 루틴아이템 0..1 — 한 제품은 최대 하나의 루틴 아이템으로만 담김
+    // 사용자 제품 1 : 루틴아이템 0..1 — 한 사용자 제품은 최대 하나의 루틴 아이템으로만 담김
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", unique = true, nullable = false)
-    private Product product;
+    @JoinColumn(name = "user_product_id", unique = true, nullable = false)
+    private UserProduct userProduct;
 
     @Enumerated(EnumType.STRING)
     @Column

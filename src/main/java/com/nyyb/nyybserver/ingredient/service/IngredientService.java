@@ -144,7 +144,7 @@ public class IngredientService {
 
         return new ProductIngredientMatchDto(
                 product.getId(),
-                product.getProductName(),
+                product.getItemName(),
                 ingredientsById.values().stream().map(IngredientDto::from).toList(),
                 matchedAllergicsById.values().stream().map(AllergicDto::from).toList()
         );

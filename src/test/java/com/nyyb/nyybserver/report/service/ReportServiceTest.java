@@ -2,7 +2,9 @@ package com.nyyb.nyybserver.report.service;
 
 import com.nyyb.nyybserver.product.data.entity.Product;
 import com.nyyb.nyybserver.product.data.entity.ProductIngredient;
-import com.nyyb.nyybserver.product.data.enums.ProductCategory;
+import com.nyyb.nyybserver.product.data.entity.UserProduct;
+import com.nyyb.nyybserver.product.data.enums.CategoryMain;
+import com.nyyb.nyybserver.product.data.enums.CategorySub;
 import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 import com.nyyb.nyybserver.analysis.data.enums.RoutineSlot;
 import com.nyyb.nyybserver.product.data.repository.ProductIngredientRepository;
@@ -66,9 +68,14 @@ class ReportServiceTest {
 
         Product product = Product.builder()
                 .id(11L)
-                .imageKey("analysis/test.png")
-                .category(ProductCategory.SERUM)
-                .productName("테스트 세럼")
+                .itemName("테스트 세럼")
+                .categoryMain(CategoryMain.SKIN_CARE)
+                .categorySub(CategorySub.SERUM)
+                .build();
+
+        UserProduct userProduct = UserProduct.builder()
+                .id(UUID.randomUUID())
+                .product(product)
                 .build();
 
         RoutineItemSelection morningSelection = RoutineItemSelection.builder()
@@ -82,7 +89,7 @@ class ReportServiceTest {
 
         RoutineItem item = RoutineItem.builder()
                 .routine(routine)
-                .product(product)
+                .userProduct(userProduct)
                 .userRoutineSlot(RoutineSlot.BOTH)
                 .llmRoutineSlot(RoutineSlot.EVENING)
                 .recommended(RecommendStatus.REMOVE)

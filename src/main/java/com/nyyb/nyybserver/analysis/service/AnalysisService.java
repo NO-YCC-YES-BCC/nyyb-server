@@ -6,9 +6,10 @@ import com.nyyb.nyybserver.analysis.data.dto.response.AnalysisResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.AnalysisSummaryDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmAnalysisResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmProductAnalysisDto;
-import com.nyyb.nyybserver.analysis.data.dto.response.LlmProductNameDto;
 import com.nyyb.nyybserver.analysis.data.entity.Analysis;
+import com.nyyb.nyybserver.product.data.dto.response.ProductIngredientMappingDto;
 import com.nyyb.nyybserver.product.data.entity.Product;
+import com.nyyb.nyybserver.product.data.entity.UserProduct;
 import com.nyyb.nyybserver.product.data.entity.ProductIngredient;
 import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 import com.nyyb.nyybserver.analysis.data.exception.AnalysisNotFoundException;
@@ -16,6 +17,8 @@ import com.nyyb.nyybserver.product.data.exception.ProductNotFoundException;
 import com.nyyb.nyybserver.analysis.data.repository.AnalysisRepository;
 import com.nyyb.nyybserver.product.data.repository.ProductIngredientRepository;
 import com.nyyb.nyybserver.product.data.repository.ProductRepository;
+import com.nyyb.nyybserver.product.data.repository.UserProductRepository;
+import com.nyyb.nyybserver.product.service.ProductService;
 import com.nyyb.nyybserver.ingredient.data.entity.Ingredient;
 import com.nyyb.nyybserver.routine.data.entity.Routine;
 import com.nyyb.nyybserver.routine.data.entity.RoutineItem;
@@ -59,6 +62,8 @@ public class AnalysisService {
     private final ChatClient chatClient;
     private final AnalysisRepository analysisRepository;
     private final ProductRepository productRepository;
+    private final UserProductRepository userProductRepository;
+    private final ProductService productService;
     private final ProductIngredientRepository productIngredientRepository;
     private final RoutineRepository routineRepository;
     private final RoutineItemRepository routineItemRepository;
@@ -80,12 +85,15 @@ public class AnalysisService {
         // 현재 로그인 사용자(게스트/카카오 공통)를 소유자로 지정
         User owner = userRepository.getReferenceById(userId);
 
-        // 요청한 제품이 모두 본인 소유인지 검증. 하나라도 남의 것이면 전체 거절한다.
-        // (Product.id가 순차 증가라 열거가 쉬우므로, 검증 없이는 남의 제품을 자기 분석에 재매핑할 수 있다)
-        Map<Long, Product> productMap = loadOwnedProducts(productIds, userId);
+        // 요청 productId는 제품 마스터(카탈로그) id다. 존재하지 않는 id가 섞이면 전체 거절한다.
+        Map<Long, Product> productMap = loadProducts(productIds);
 
-        // 프롬프트에 넣는 제품 순서는 촬영 순서(productId 오름차순)로 고정한다.
+        // 프롬프트에 넣는 제품 순서는 productId 오름차순으로 고정한다.
         List<Long> orderedProductIds = productIds.stream().distinct().sorted().toList();
+
+        // 프롬프트에 실을 성분을 먼저 채운다. 마스터에 전성분이 아직 없는 제품만 웹 조회를 타고,
+        // 이미 매핑돼 있으면 ProductService가 LLM 호출 없이 기존 매핑을 그대로 쓴다.
+        orderedProductIds.forEach(this::ensureIngredientsMapped);
 
         String userMessage = buildUserMessage(orderedProductIds, productMap);
         log.info("OpenAI 요청 메시지:\n{}", userMessage);
@@ -103,23 +111,32 @@ public class AnalysisService {
             throw new IllegalStateException("분석 응답이 비어 있습니다.");
         }
 
-        // 1단계에서 확정된 제품명. 응답의 productName과 recommendReason 속 제품 지칭이 같은 이름을 쓰게 하는 단일 출처다.
-        Map<Long, String> productNames = resolveProductNames(llmResponse.productNames(), orderedProductIds, productMap);
-
-        // 저장 값과 응답 값이 갈라지지 않도록 제품별 결과를 한 번만 만들어 두 곳에 함께 쓴다.
-        List<AnalysisProductDto> analyzed = llmResponse.products().stream()
-                .map(result -> toProductDto(result, productMap, productNames))
-                .toList();
-
         // 한국 날짜 + 제품 개수로 만든 목록 표시용 문구 (분석·루틴 공용)
         String title = buildTitle(productIds.size());
 
-        // Analysis 저장 후 결과를 각 Product에 반영(더티 체킹)
         Analysis analysis = analysisRepository.save(Analysis.builder()
                 .user(owner)
                 .title(title)
                 .build());
-        analyzed.forEach(product -> applyToProduct(analysis, product, productMap));
+
+        // 분석 시점에 사용자 제품(UserProduct)을 생성한다. 마스터 productId -> UserProduct 매핑으로
+        // LLM 응답(마스터 id 기준)을 사용자 제품에 되돌려 붙인다.
+        Map<Long, UserProduct> userProducts = new HashMap<>();
+        for (Long productId : orderedProductIds) {
+            userProducts.put(productId, userProductRepository.save(UserProduct.builder()
+                    .user(owner)
+                    .product(productMap.get(productId))
+                    .analysis(analysis)
+                    .build()));
+        }
+
+        // 저장 값과 응답 값이 갈라지지 않도록 제품별 결과를 한 번만 만들어 두 곳에 함께 쓴다.
+        List<AnalysisProductDto> analyzed = llmResponse.products().stream()
+                .map(result -> toProductDto(result, productMap, userProducts))
+                .toList();
+
+        llmResponse.products().forEach(result -> userProducts.get(result.productId())
+                .applyAnalysis(analysis, result.recommended(), resolveReason(result)));
 
         // saveRoutine 통합: 분석 1개당 Routine 1개 생성 + productId별 userRoutineSlot을 RoutineItem으로 저장
         Routine routine = routineRepository.save(Routine.builder()
@@ -132,7 +149,7 @@ public class AnalysisService {
         for (AnalysisRequestDto.ProductSlot productSlot : productSlots) {
             routineItemRepository.save(RoutineItem.builder()
                     .routine(routine)
-                    .product(productMap.get(productSlot.getProductId()))
+                    .userProduct(userProducts.get(productSlot.getProductId()))
                     .userRoutineSlot(productSlot.getUserRoutineSlot())
                     .build());
         }
@@ -153,18 +170,18 @@ public class AnalysisService {
     @Transactional(readOnly = true)
     public List<AnalysisSummaryDto> getAnalyses(Long userId, Pageable pageable) {
         List<Analysis> analyses = analysisRepository.findByUserIdOrderByCreatedAtDescIdDesc(userId, pageable);
-        Map<UUID, List<ProductRepository.RecommendCount>> countsByAnalysisId = summarizeProductCounts(analyses);
+        Map<UUID, List<UserProductRepository.RecommendCount>> countsByAnalysisId = summarizeProductCounts(analyses);
 
         return analyses.stream()
                 .map(analysis -> {
-                    List<ProductRepository.RecommendCount> counts =
+                    List<UserProductRepository.RecommendCount> counts =
                             countsByAnalysisId.getOrDefault(analysis.getId(), List.of());
                     long productCount = counts.stream()
-                            .mapToLong(ProductRepository.RecommendCount::getCount)
+                            .mapToLong(UserProductRepository.RecommendCount::getCount)
                             .sum();
                     long removeCount = counts.stream()
                             .filter(count -> count.getRecommended() == RecommendStatus.REMOVE)
-                            .mapToLong(ProductRepository.RecommendCount::getCount)
+                            .mapToLong(UserProductRepository.RecommendCount::getCount)
                             .sum();
                     return AnalysisSummaryDto.from(analysis, productCount, removeCount);
                 })
@@ -172,14 +189,14 @@ public class AnalysisService {
     }
 
     // 분석 목록의 productId를 한 번에 집계 조회해 analysisId별로 그룹핑 (N+1 방지)
-    private Map<UUID, List<ProductRepository.RecommendCount>> summarizeProductCounts(List<Analysis> analyses) {
+    private Map<UUID, List<UserProductRepository.RecommendCount>> summarizeProductCounts(List<Analysis> analyses) {
         if (analyses.isEmpty()) {
             return Map.of();
         }
 
         List<UUID> analysisIds = analyses.stream().map(Analysis::getId).toList();
-        return productRepository.countGroupByAnalysisIdAndRecommended(analysisIds).stream()
-                .collect(Collectors.groupingBy(ProductRepository.RecommendCount::getAnalysisId));
+        return userProductRepository.countGroupByAnalysisIdAndRecommended(analysisIds).stream()
+                .collect(Collectors.groupingBy(UserProductRepository.RecommendCount::getAnalysisId));
     }
 
     /**
@@ -200,12 +217,12 @@ public class AnalysisService {
                 .orElse(null);
 
         // REMOVE 먼저, KEEP 나중 순으로 정렬해 반환 (analyze와 동일)
-        List<AnalysisProductDto> products = productRepository.findByAnalysisIdOrderByIdAsc(analysisId).stream()
-                .map(product -> new AnalysisProductDto(
-                        product.getId(),
-                        displayName(product),
-                        product.getRecommended(),
-                        product.getRecommendReason()))
+        List<AnalysisProductDto> products = userProductRepository.findByAnalysisIdWithProduct(analysisId).stream()
+                .map(userProduct -> new AnalysisProductDto(
+                        userProduct.getId(),
+                        displayName(userProduct.getProduct()),
+                        userProduct.getRecommended(),
+                        userProduct.getRecommendReason()))
                 .sorted(REMOVE_FIRST)
                 .toList();
 
@@ -241,10 +258,10 @@ public class AnalysisService {
      * @return productId -> Product 매핑
      * @throws ProductNotFoundException 요청 id 중 본인 소유가 아닌 것이 있는 경우
      */
-    private Map<Long, Product> loadOwnedProducts(List<Long> productIds, Long userId) {
+    private Map<Long, Product> loadProducts(List<Long> productIds) {
         List<Long> distinctIds = productIds.stream().distinct().toList();
 
-        List<Product> products = productRepository.findByIdInAndUserId(distinctIds, userId);
+        List<Product> products = productRepository.findAllById(distinctIds);
         if (products.size() != distinctIds.size()) {
             throw new ProductNotFoundException();
         }
@@ -261,11 +278,29 @@ public class AnalysisService {
             Product product = productMap.get(productId);
 
             sb.append("=== productId: ").append(productId).append(" ===\n");
-            sb.append("category: ").append(product.getCategory().describe()).append("\n");
+            sb.append("productName: ").append(product.getItemName()).append("\n");
+            sb.append("categoryMain: ").append(product.getCategoryMainLabel()).append("\n");
+            sb.append("categorySub: ").append(product.getCategorySubLabel()).append("\n");
             sb.append("ingredients: ").append(formatIngredients(productId)).append("\n\n");
         }
 
         return sb.toString();
+    }
+
+    /**
+     * 제품 마스터에 전성분이 없으면 웹에서 찾아 성분 마스터와 매핑해 둔다.
+     * 조회에 실패해도 분석 자체는 진행한다. (성분이 비면 프롬프트에 "인식된 성분 없음"으로 나간다)
+     */
+    private void ensureIngredientsMapped(Long productId) {
+        try {
+            ProductIngredientMappingDto mapping = productService.mapIngredientsFromWeb(productId);
+            if (!mapping.alreadyMapped()) {
+                log.info("전성분을 새로 매핑했습니다. productId={}, 매칭 {}/{}건",
+                        productId, mapping.matchedCount(), mapping.totalCount());
+            }
+        } catch (RuntimeException e) {
+            log.warn("전성분 조회에 실패해 기존 성분만으로 분석합니다. productId={}", productId, e);
+        }
     }
 
     // 해당 제품의 성분을 "성분명(위험도) - 설명" 형태로 나열
@@ -297,54 +332,22 @@ public class AnalysisService {
     }
 
     /**
-     * 1단계 productNames 응답을 productId -> 제품명 맵으로 정리한다.
-     * 제품명은 응답 productName과 recommendReason 속 제품 지칭에 함께 쓰이므로 여기서 한 번만 확정한다.
-     * @param names            LLM이 1단계에서 뽑은 제품명 목록
-     * @param productIds       프롬프트에 넣은 제품 id 목록 (촬영 순서)
-     * @param productMap       productId -> Product 매핑
-     * @return productId -> 제품명 (누락·공백이면 카테고리 한글명으로 대체)
-     * @throws IllegalArgumentException LLM이 요청에 없던 productId를 지어낸 경우
-     */
-    private Map<Long, String> resolveProductNames(
-            List<LlmProductNameDto> names,
-            List<Long> productIds,
-            Map<Long, Product> productMap
-    ) {
-        Map<Long, String> extracted = new HashMap<>();
-        for (LlmProductNameDto name : names == null ? List.<LlmProductNameDto>of() : names) {
-            if (!productMap.containsKey(name.productId())) {
-                throw new IllegalArgumentException("요청에 없는 productId: " + name.productId());
-            }
-            if (StringUtils.hasText(name.productName())) {
-                extracted.put(name.productId(), name.productName().strip());
-            }
-        }
-
-        // 제품명을 못 뽑았어도 화면에는 무언가 보여야 하므로 카테고리 한글명으로 대체한다. (id 노출 방지)
-        Map<Long, String> resolved = new HashMap<>();
-        for (Long productId : productIds) {
-            resolved.put(productId, extracted.getOrDefault(
-                    productId, productMap.get(productId).getCategory().getKorName()));
-        }
-        return resolved;
-    }
-
-    /**
-     * LLM 제품별 결과 -> 저장·응답 공용 DTO. LLM이 요청에 없던 id를 지어내면 거절한다.
-     * @param result       2단계 판단 결과
-     * @param productMap   productId -> Product 매핑
-     * @param productNames 1단계에서 확정한 productId -> 제품명
+     * LLM 제품별 결과 -> 응답 DTO. LLM이 요청에 없던 마스터 productId를 지어내면 거절한다.
+     * 응답에 싣는 식별자는 마스터 id가 아니라 사용자 제품(UserProduct)의 id다.
+     * @param result       LLM 판단 결과 (마스터 productId 기준)
+     * @param productMap   마스터 productId -> Product
+     * @param userProducts 마스터 productId -> UserProduct
      * @throws IllegalArgumentException 요청에 없던 productId인 경우
      */
     private AnalysisProductDto toProductDto(LlmProductAnalysisDto result,
-                                            Map<Long, Product> productMap, Map<Long, String> productNames) {
+                                            Map<Long, Product> productMap, Map<Long, UserProduct> userProducts) {
         if (!productMap.containsKey(result.productId())) {
             throw new IllegalArgumentException("요청에 없는 productId: " + result.productId());
         }
 
         return new AnalysisProductDto(
-                result.productId(),
-                productNames.get(result.productId()),
+                userProducts.get(result.productId()).getId(),
+                displayName(productMap.get(result.productId())),
                 result.recommended(),
                 resolveReason(result));
     }
@@ -357,16 +360,8 @@ public class AnalysisService {
         return result.recommended() == RecommendStatus.REMOVE ? DEFAULT_REMOVE_REASON : DEFAULT_KEEP_REASON;
     }
 
-    // 제품명이 비어 있으면 카테고리 한글명으로 대체한다. (제품명 없이 저장된 예전 데이터 방어)
+    // 품목명이 비어 있는 마스터 행 방어. (전체 19.5만 건 중 품목명 없는 행이 존재한다)
     private String displayName(Product product) {
-        return StringUtils.hasText(product.getProductName())
-                ? product.getProductName()
-                : product.getCategory().getKorName();
-    }
-
-    // 결과 -> 같은 productId Product에 반영
-    private void applyToProduct(Analysis analysis, AnalysisProductDto product, Map<Long, Product> productMap) {
-        productMap.get(product.productId())
-                .applyAnalysis(analysis, product.productName(), product.recommended(), product.recommendReason());
+        return StringUtils.hasText(product.getItemName()) ? product.getItemName() : "이름 미상 제품";
     }
 }
