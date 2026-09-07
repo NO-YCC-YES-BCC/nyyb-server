@@ -22,7 +22,7 @@ public class ProductController {
 
     private final ProductService productSearchService;
 
-    // 품목명 검색. 공백으로 구분한 여러 단어를 모두 포함하는 제품을 찾는다. (예: keyword=헤브블루 크림)
+    // 품목명 검색. 공백으로 구분한 여러 단어를 모두 포함하는 제품을 찾는다. (예: keyword=브랜드명 크림)
     @GetMapping
     public GlobalResponse<List<ProductSearchDto>> searchProducts(
             @RequestParam String keyword,
