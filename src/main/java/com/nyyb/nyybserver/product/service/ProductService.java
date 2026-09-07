@@ -16,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -70,9 +71,13 @@ public class ProductService {
      * "Ascorbic Acid" 같은 이명 표기도 대표 성분으로 걸린다. 마스터에 없으면 저장하지 않고 unmatched로 돌려준다.
      * 이미 매핑된 전성분이 있으면 LLM을 호출하지 않고 저장돼 있던 매핑을 그대로 돌려준다.
      *
+     * 호출자(분석 등)의 트랜잭션과 분리해 독립 트랜잭션으로 돈다.
+     * 전성분 조회는 외부 API라 실패가 잦은데, 같은 트랜잭션에 참여하면 여기서 난 예외를
+     * 호출자가 잡고 넘어가도 트랜잭션이 rollback-only로 남아 커밋 시점에 전체가 롤백된다.
+     *
      * @throws ProductNotFoundException 해당 id의 제품이 없는 경우
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ProductIngredientMappingDto mapIngredientsFromWeb(Long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(ProductNotFoundException::new);
