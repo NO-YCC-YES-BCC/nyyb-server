@@ -7,8 +7,6 @@ public enum ErrorCode {
     // 400
     INVALID_REQUEST("C001", "잘못된 요청입니다.", 400),
     INVALID_PARAMETER("C002", "유효하지 않은 파라미터입니다.", 400),
-    INVALID_IMAGE("C003", "이미지 파일이 올바르지 않습니다.", 400),
-    UNSUPPORTED_IMAGE_FORMAT("C004", "지원하지 않는 이미지 형식입니다.", 400),
 
     // 401
     VERIFICATION_INVALID("C4011", "인증 정보가 유효하지 않습니다.", 401),
@@ -30,12 +28,11 @@ public enum ErrorCode {
     DATA_NOT_FOUND("C404", "정보를 불러올 수 없습니다.", 404),
 
     // 502
-    OCR_API_FAILED("C5021", "OCR 서비스 호출에 실패했습니다.", 502),
     KAKAO_API_FAILED("C5022", "카카오 API 호출에 실패했습니다.", 502),
     COMPATIBILITY_API_FAILED("C5023", "궁합 분석 서비스 호출에 실패했습니다.", 502),
+    PRODUCT_INGREDIENT_API_FAILED("C5024", "제품 전성분 조회 서비스 호출에 실패했습니다.", 502),
 
     // 500
-    IMAGE_UPLOAD_FAILED("C5001", "이미지 업로드에 실패했습니다.", 500),
     UNKNOWN_ERROR("C500", "오류가 발생하였습니다.", 500);
 
     private final String code;

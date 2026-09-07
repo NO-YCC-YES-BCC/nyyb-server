@@ -1,6 +1,6 @@
 package com.nyyb.nyybserver.routine.data.entity;
 
-import com.nyyb.nyybserver.analysis.data.entity.Product;
+import com.nyyb.nyybserver.product.data.entity.Product;
 import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 import com.nyyb.nyybserver.analysis.data.enums.RoutineSlot;
 import jakarta.persistence.*;

@@ -3,14 +3,14 @@ package com.nyyb.nyybserver.analysis.service;
 import com.nyyb.nyybserver.analysis.data.dto.request.CompatibilityRequestDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.CompatibilityResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmCompatibilityResponseDto;
-import com.nyyb.nyybserver.analysis.data.entity.Product;
-import com.nyyb.nyybserver.analysis.data.entity.ProductIngredient;
+import com.nyyb.nyybserver.product.data.entity.Product;
+import com.nyyb.nyybserver.product.data.entity.ProductIngredient;
 import com.nyyb.nyybserver.analysis.data.enums.CompatibilityStatus;
 import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 import com.nyyb.nyybserver.analysis.data.enums.RoutineSlot;
-import com.nyyb.nyybserver.analysis.data.exception.ProductNotFoundException;
-import com.nyyb.nyybserver.analysis.data.repository.ProductIngredientRepository;
-import com.nyyb.nyybserver.analysis.data.repository.ProductRepository;
+import com.nyyb.nyybserver.product.data.exception.ProductNotFoundException;
+import com.nyyb.nyybserver.product.data.repository.ProductIngredientRepository;
+import com.nyyb.nyybserver.product.data.repository.ProductRepository;
 import com.nyyb.nyybserver.ingredient.data.dto.response.ProductIngredientMatchDto;
 import com.nyyb.nyybserver.ingredient.data.entity.Ingredient;
 import com.nyyb.nyybserver.ingredient.service.IngredientService;
@@ -123,7 +123,7 @@ public class CompatibilityService {
     }
 
     private boolean hasCandidateData(Product candidate, List<ProductIngredient> ingredients) {
-        return StringUtils.hasText(candidate.getOcrText()) || !ingredients.isEmpty();
+        return !ingredients.isEmpty();
     }
 
     private CompatibilityResponseDto unknownResponse(
@@ -220,9 +220,6 @@ public class CompatibilityService {
         message.append("=== 새 제품 ===\n")
                 .append("productId: ").append(candidate.getId()).append('\n')
                 .append("category: ").append(candidate.getCategory().describe()).append('\n')
-                .append("ocrText:\n<ocr-data>\n")
-                .append(candidate.getOcrText() == null ? "" : candidate.getOcrText())
-                .append("\n</ocr-data>\n")
                 .append("matchedIngredients:")
                 .append(formatIngredients(candidateIngredients))
                 .append("\n\n=== 현재 루틴 ===\n")

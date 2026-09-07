@@ -1,6 +1,6 @@
 package com.nyyb.nyybserver.report.data.dto.response;
 
-import com.nyyb.nyybserver.analysis.data.enums.ProductCategory;
+import com.nyyb.nyybserver.product.data.enums.ProductCategory;
 import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 
 import java.util.List;

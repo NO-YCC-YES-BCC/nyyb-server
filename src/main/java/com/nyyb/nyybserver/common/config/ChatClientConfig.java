@@ -2,6 +2,7 @@ package com.nyyb.nyybserver.common.config;
 
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmAnalysisResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmCompatibilityResponseDto;
+import com.nyyb.nyybserver.product.data.dto.response.LlmProductIngredientsDto;
 import com.nyyb.nyybserver.routine.data.dto.response.LlmRoutineResponseDto;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.converter.BeanOutputConverter;
@@ -23,6 +24,9 @@ public class ChatClientConfig {
 
     @Value("classpath:prompts/compatibility-system-prompt.st")
     private Resource compatibilitySystemPrompt;
+
+    @Value("classpath:prompts/product-ingredient-system-prompt.st")
+    private Resource productIngredientSystemPrompt;
 
     // 빈 이름(chatClient / routineChatClient)을 주입 필드명과 맞춰 구분 주입한다.
     @Bean
@@ -46,6 +50,14 @@ public class ChatClientConfig {
         return builder
                 .defaultSystem(compatibilitySystemPrompt)
                 .defaultOptions(strictJsonOptions("compatibility_analysis", LlmCompatibilityResponseDto.class))
+                .build();
+    }
+
+    @Bean
+    public ChatClient productIngredientChatClient(ChatClient.Builder builder) {
+        return builder
+                .defaultSystem(productIngredientSystemPrompt)
+                .defaultOptions(strictJsonOptions("product_ingredients", LlmProductIngredientsDto.class))
                 .build();
     }
 

@@ -1,6 +1,6 @@
 package com.nyyb.nyybserver.routine.data.dto.response;
 
-import com.nyyb.nyybserver.analysis.data.enums.ProductCategory;
+import com.nyyb.nyybserver.product.data.enums.ProductCategory;
 
 public record RoutineProductDto(
         Long id,                    // productId

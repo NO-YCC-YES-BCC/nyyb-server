@@ -1,10 +1,10 @@
 package com.nyyb.nyybserver.report.service;
 
-import com.nyyb.nyybserver.analysis.data.entity.Product;
-import com.nyyb.nyybserver.analysis.data.entity.ProductIngredient;
+import com.nyyb.nyybserver.product.data.entity.Product;
+import com.nyyb.nyybserver.product.data.entity.ProductIngredient;
 import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 import com.nyyb.nyybserver.analysis.data.enums.RoutineSlot;
-import com.nyyb.nyybserver.analysis.data.repository.ProductIngredientRepository;
+import com.nyyb.nyybserver.product.data.repository.ProductIngredientRepository;
 import com.nyyb.nyybserver.ingredient.data.entity.Ingredient;
 import com.nyyb.nyybserver.report.data.dto.response.ReportDayDto;
 import com.nyyb.nyybserver.report.data.dto.response.ReportIngredientDto;

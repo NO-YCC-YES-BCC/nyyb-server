@@ -1,4 +1,4 @@
-package com.nyyb.nyybserver.analysis.data.exception;
+package com.nyyb.nyybserver.product.data.exception;
 
 import com.nyyb.nyybserver.common.response.ErrorCode;
 import com.nyyb.nyybserver.common.response.GlobalException;

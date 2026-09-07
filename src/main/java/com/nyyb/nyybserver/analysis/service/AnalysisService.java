@@ -8,14 +8,14 @@ import com.nyyb.nyybserver.analysis.data.dto.response.LlmAnalysisResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmProductAnalysisDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmProductNameDto;
 import com.nyyb.nyybserver.analysis.data.entity.Analysis;
-import com.nyyb.nyybserver.analysis.data.entity.Product;
-import com.nyyb.nyybserver.analysis.data.entity.ProductIngredient;
+import com.nyyb.nyybserver.product.data.entity.Product;
+import com.nyyb.nyybserver.product.data.entity.ProductIngredient;
 import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 import com.nyyb.nyybserver.analysis.data.exception.AnalysisNotFoundException;
-import com.nyyb.nyybserver.analysis.data.exception.ProductNotFoundException;
+import com.nyyb.nyybserver.product.data.exception.ProductNotFoundException;
 import com.nyyb.nyybserver.analysis.data.repository.AnalysisRepository;
-import com.nyyb.nyybserver.analysis.data.repository.ProductIngredientRepository;
-import com.nyyb.nyybserver.analysis.data.repository.ProductRepository;
+import com.nyyb.nyybserver.product.data.repository.ProductIngredientRepository;
+import com.nyyb.nyybserver.product.data.repository.ProductRepository;
 import com.nyyb.nyybserver.ingredient.data.entity.Ingredient;
 import com.nyyb.nyybserver.routine.data.entity.Routine;
 import com.nyyb.nyybserver.routine.data.entity.RoutineItem;
@@ -262,7 +262,6 @@ public class AnalysisService {
 
             sb.append("=== productId: ").append(productId).append(" ===\n");
             sb.append("category: ").append(product.getCategory().describe()).append("\n");
-            sb.append("ocrText: ").append(product.getOcrText()).append("\n");
             sb.append("ingredients: ").append(formatIngredients(productId)).append("\n\n");
         }
 

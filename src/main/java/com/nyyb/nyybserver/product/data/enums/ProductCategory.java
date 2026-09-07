@@ -1,4 +1,4 @@
-package com.nyyb.nyybserver.analysis.data.enums;
+package com.nyyb.nyybserver.product.data.enums;
 
 import lombok.Getter;
 

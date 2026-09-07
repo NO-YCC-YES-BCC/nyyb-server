@@ -1,10 +1,9 @@
-package com.nyyb.nyybserver.analysis.data.repository;
+package com.nyyb.nyybserver.product.data.repository;
 
-import com.nyyb.nyybserver.analysis.data.entity.Product;
+import com.nyyb.nyybserver.product.data.entity.Product;
 import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
-import com.nyyb.nyybserver.user.data.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -13,7 +12,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface ProductRepository extends JpaRepository<Product, Long> {
+public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
 
     // 상세 조회: 해당 분석에 속한 제품들 (등록 순)
     List<Product> findByAnalysisIdOrderByIdAsc(UUID analysisId);
@@ -34,9 +33,4 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     // 단일 제품 소유권 검증 조회
     Optional<Product> findByIdAndUserId(Long id, Long userId);
-
-    // 게스트→소셜 병합 시 소유자 재지정
-    @Modifying
-    @Query("update Product p set p.user = :newOwner where p.user = :previousOwner")
-    int transferOwner(@Param("previousOwner") User previousOwner, @Param("newOwner") User newOwner);
 }
