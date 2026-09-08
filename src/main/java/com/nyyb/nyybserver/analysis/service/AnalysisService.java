@@ -73,7 +73,7 @@ public class AnalysisService {
      * 제품들 -> LLM 제외/유지 분석 -> Product·Analysis 반영 -> Routine·RoutineItem 생성(saveRoutine 통합) -> routineId + LLM 응답 반환
      * @param request productId + userRoutineSlot 목록
      * @param userId  소유자로 지정할 현재 로그인 유저 id(게스트/카카오 공통)
-     * @return AnalysisResponseDto (routineId + 제품별 분석 결과)
+     * @return AnalysisResponseDto (analysisId + routineId + 제품별 분석 결과)
      */
     @Transactional
     public AnalysisResponseDto analyze(AnalysisRequestDto request, Long userId) {
@@ -154,7 +154,7 @@ public class AnalysisService {
         List<AnalysisProductDto> sorted = analyzed.stream()
                 .sorted(REMOVE_FIRST)
                 .toList();
-        return new AnalysisResponseDto(routine.getId(), title, sorted);
+        return new AnalysisResponseDto(analysis.getId(), routine.getId(), title, sorted);
     }
 
     /**
@@ -199,7 +199,7 @@ public class AnalysisService {
      * 분석 상세 조회. 저장된 Analysis·Product·Routine으로 analyze와 동일한 응답을 재구성한다.
      * @param analysisId 조회할 분석 id
      * @param userId     소유자 id (본인 분석만 조회 가능)
-     * @return AnalysisResponseDto (routineId + title + 제품별 분석 결과)
+     * @return AnalysisResponseDto (analysisId + routineId + title + 제품별 분석 결과)
      * @throws AnalysisNotFoundException 해당 id의 분석이 없거나 본인 소유가 아닌 경우
      */
     @Transactional(readOnly = true)
@@ -222,7 +222,7 @@ public class AnalysisService {
                 .sorted(REMOVE_FIRST)
                 .toList();
 
-        return new AnalysisResponseDto(routineId, analysis.getTitle(), products);
+        return new AnalysisResponseDto(analysis.getId(), routineId, analysis.getTitle(), products);
     }
 
     /**
