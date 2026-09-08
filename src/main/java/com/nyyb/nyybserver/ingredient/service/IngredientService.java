@@ -144,13 +144,13 @@ public class IngredientService {
 
         return new ProductIngredientMatchDto(
                 product.getId(),
-                product.getItemName(),
+                product.getDisplayName(),
                 ingredientsById.values().stream().map(IngredientDto::from).toList(),
                 matchedAllergicsById.values().stream().map(AllergicDto::from).toList()
         );
     }
 
-    // 소문자화 + 모든 공백 제거 (IngredientIndex와 동일한 정규화 규칙)
+    // 소문자화 + 모든 공백 제거
     private String normalize(String text) {
         if (text == null) {
             return "";

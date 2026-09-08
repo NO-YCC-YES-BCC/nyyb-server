@@ -133,7 +133,7 @@ public class CompatibilityService {
     ) {
         return new CompatibilityResponseDto(
                 candidate.getId(),
-                displayName(candidate),
+                candidate.getDisplayName(),
                 RecommendStatus.KEEP,
                 UNKNOWN_SUMMARY + " " + UNKNOWN_GUIDE,
                 ingredientMatch.ingredients(),
@@ -175,7 +175,7 @@ public class CompatibilityService {
         for (RoutineProductContext context : currentProducts) {
             List<String> overlapping = overlappingIngredients(candidateIngredients, context.ingredients());
             if (!overlapping.isEmpty()) {
-                lines.add(joinWithParticle(displayName(context.product()))
+                lines.add(joinWithParticle(context.product().getDisplayName())
                         + " " + overlapping.size() + "개 성분 중복");
             }
         }
@@ -220,7 +220,7 @@ public class CompatibilityService {
         StringBuilder message = new StringBuilder();
         message.append("=== 새 제품 ===\n")
                 .append("productId: ").append(candidate.getId()).append('\n')
-                .append("productName: ").append(displayName(candidate)).append('\n')
+                .append("productName: ").append(candidate.getDisplayName()).append('\n')
                 .append("categoryMain: ").append(candidate.getCategoryMainLabel()).append('\n')
                 .append("categorySub: ").append(candidate.getCategorySubLabel()).append('\n')
                 .append("matchedIngredients:")
@@ -232,7 +232,7 @@ public class CompatibilityService {
             Product product = context.product();
             message.append("--- 기존 루틴 제품 ---\n")
                     .append("productId: ").append(product.getId()).append('\n')
-                    .append("productName: ").append(displayName(product)).append('\n')
+                    .append("productName: ").append(product.getDisplayName()).append('\n')
                     .append("categoryMain: ").append(product.getCategoryMainLabel()).append('\n')
                     .append("categorySub: ").append(product.getCategorySubLabel()).append('\n')
                     .append("activeSlots: ").append(formatSlots(context.slots())).append('\n')
@@ -280,12 +280,6 @@ public class CompatibilityService {
 
     private String normalizeName(String value) {
         return value.replaceAll("[\\s_-]", "").toLowerCase(Locale.ROOT);
-    }
-
-    private String displayName(Product product) {
-        return StringUtils.hasText(product.getItemName())
-                ? product.getItemName()
-                : product.getCategoryMainLabel() + " " + product.getId();
     }
 
     private String safeText(String value, String fallback) {

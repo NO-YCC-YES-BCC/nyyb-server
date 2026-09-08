@@ -155,11 +155,11 @@ class CompatibilityServiceTest {
         assertEquals("테스트 세럼", response.productName());
         assertEquals(RecommendStatus.REMOVE, response.recommended());
         assertEquals(
-                keptProduct.getItemName() + "과 1개 성분 중복\n"
+                keptProduct.getDisplayName() + "과 1개 성분 중복\n"
                         + "현재 루틴과 겹치는 구성이 있어 사용 시간대를 나누는 방법을 고려해볼 수 있어요.",
                 response.recommendReason()
         );
-        assertFalse(response.recommendReason().contains(removedProduct.getItemName()));
+        assertFalse(response.recommendReason().contains(removedProduct.getDisplayName()));
         assertEquals(ingredientMatch.ingredients(), response.ingredients());
         assertEquals(ingredientMatch.allergics(), response.allergics());
 
@@ -188,7 +188,7 @@ class CompatibilityServiceTest {
     private Product product(Long id, String productName) {
         return Product.builder()
                 .id(id)
-                .itemName(productName)
+                .nameKo(productName)
                 .categoryMain(CategoryMain.SKIN_CARE)
                 .categorySub(CategorySub.SERUM)
                 .build();

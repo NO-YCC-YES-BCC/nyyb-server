@@ -68,7 +68,7 @@ class ReportServiceTest {
 
         Product product = Product.builder()
                 .id(11L)
-                .itemName("테스트 세럼")
+                .nameKo("테스트 세럼")
                 .categoryMain(CategoryMain.SKIN_CARE)
                 .categorySub(CategorySub.SERUM)
                 .build();

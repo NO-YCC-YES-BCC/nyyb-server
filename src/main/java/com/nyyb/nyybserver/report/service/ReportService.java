@@ -89,7 +89,7 @@ public class ReportService {
                 userProduct.getId(),
                 product.getCategoryMainLabel(),
                 product.getCategorySubLabel(),
-                product.getItemName(),
+                product.getDisplayName(),
                 recommendation,
                 recommendationReasonFor(item, recommendation),
                 selectedFor(item, slot),

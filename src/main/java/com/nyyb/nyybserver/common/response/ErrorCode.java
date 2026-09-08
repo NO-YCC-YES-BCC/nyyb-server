@@ -30,7 +30,6 @@ public enum ErrorCode {
     // 502
     KAKAO_API_FAILED("C5022", "카카오 API 호출에 실패했습니다.", 502),
     COMPATIBILITY_API_FAILED("C5023", "궁합 분석 서비스 호출에 실패했습니다.", 502),
-    PRODUCT_INGREDIENT_API_FAILED("C5024", "제품 전성분 조회 서비스 호출에 실패했습니다.", 502),
 
     // 500
     UNKNOWN_ERROR("C500", "오류가 발생하였습니다.", 500);

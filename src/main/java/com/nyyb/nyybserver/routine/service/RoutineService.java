@@ -266,7 +266,7 @@ public class RoutineService {
                 userProduct.getId(),
                 product.getCategoryMainLabel(),
                 product.getCategorySubLabel(),
-                product.getItemName(),
+                product.getDisplayName(),
                 recommended,
                 recommendReason
         );
@@ -326,7 +326,7 @@ public class RoutineService {
                             item.getUserProduct().getId(),
                             product.getCategoryMainLabel(),
                             product.getCategorySubLabel(),
-                            product.getItemName());
+                            product.getDisplayName());
                 })
                 .toList();
     }
@@ -340,7 +340,7 @@ public class RoutineService {
         for (UserProduct userProduct : userProducts) {
             Product product = userProduct.getProduct();
             sb.append("=== productId: ").append(product.getId()).append(" ===\n");
-            sb.append("productName: ").append(product.getItemName()).append("\n");
+            sb.append("productName: ").append(product.getDisplayName()).append("\n");
             sb.append("categoryMain: ").append(product.getCategoryMainLabel()).append("\n");
             sb.append("categorySub: ").append(product.getCategorySubLabel()).append("\n");
             sb.append("recommended: ").append(userProduct.getRecommended()).append("\n");

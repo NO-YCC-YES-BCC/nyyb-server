@@ -53,9 +53,6 @@ public class AnalysisService {
     private static final String DEFAULT_KEEP_REASON = "겹치는 성분이 적어 유지를 고려해볼 수 있어요.";
     private static final String DEFAULT_REMOVE_REASON = "성분 구성이 겹쳐 제외를 고려해볼 수 있어요.";
 
-    // 마스터에 값이 없는 항목을 프롬프트에 표시할 때 쓰는 문구
-    private static final String NO_DATA = "(정보 없음)";
-
     // 응답 정렬: REMOVE 먼저, KEEP 나중 (analyze·상세 조회 공용)
     private static final Comparator<AnalysisProductDto> REMOVE_FIRST =
             Comparator.comparingInt(p -> p.recommended() == RecommendStatus.REMOVE ? 0 : 1);
@@ -216,7 +213,7 @@ public class AnalysisService {
         List<AnalysisProductDto> products = userProductRepository.findByAnalysisIdWithProduct(analysisId).stream()
                 .map(userProduct -> new AnalysisProductDto(
                         userProduct.getId(),
-                        displayName(userProduct.getProduct()),
+                        userProduct.getProduct().getDisplayName(),
                         userProduct.getRecommended(),
                         userProduct.getRecommendReason()))
                 .sorted(REMOVE_FIRST)
@@ -265,7 +262,7 @@ public class AnalysisService {
         return products.stream().collect(Collectors.toMap(Product::getId, Function.identity()));
     }
 
-    // 제품별 productId + 품목명 + category + pH + 효능효과 + 성분 -> 프롬프트 텍스트로 조립
+    // 제품별 productId + 제품명 + category + 성분 -> 프롬프트 텍스트로 조립
     private String buildUserMessage(List<Long> productIds, Map<Long, Product> productMap) {
         StringBuilder sb = new StringBuilder();
         sb.append("다음 제품들을 분석해 주세요.\n\n");
@@ -274,32 +271,13 @@ public class AnalysisService {
             Product product = productMap.get(productId);
 
             sb.append("=== productId: ").append(productId).append(" ===\n");
-            sb.append("productName: ").append(product.getItemName()).append("\n");
+            sb.append("productName: ").append(product.getDisplayName()).append("\n");
             sb.append("categoryMain: ").append(product.getCategoryMainLabel()).append("\n");
             sb.append("categorySub: ").append(product.getCategorySubLabel()).append("\n");
-            sb.append("itemPh: ").append(formatValue(product.getItemPh())).append("\n");
-            sb.append("effects: ").append(formatEffects(product)).append("\n");
             sb.append("ingredients: ").append(formatIngredients(productId)).append("\n\n");
         }
 
         return sb.toString();
-    }
-
-    // 마스터에 비어 있는 값이 "null"로 프롬프트에 나가지 않게 한다.
-    private String formatValue(String value) {
-        return StringUtils.hasText(value) ? value.strip() : NO_DATA;
-    }
-
-    // 효능효과 문서(DOC XML)에서 뽑은 문구를 성분 목록과 같은 들여쓰기 형태로 나열
-    private String formatEffects(Product product) {
-        List<String> effects = product.getEffectTexts();
-        if (effects.isEmpty()) {
-            return NO_DATA;
-        }
-
-        return effects.stream()
-                .map(effect -> "\n  - " + effect)
-                .collect(Collectors.joining());
     }
 
     // 해당 제품의 성분을 "성분명(위험도) - 설명" 형태로 나열
@@ -346,7 +324,7 @@ public class AnalysisService {
 
         return new AnalysisProductDto(
                 userProducts.get(result.productId()).getId(),
-                displayName(productMap.get(result.productId())),
+                productMap.get(result.productId()).getDisplayName(),
                 result.recommended(),
                 resolveReason(result));
     }
@@ -357,10 +335,5 @@ public class AnalysisService {
             return result.recommendReason().strip();
         }
         return result.recommended() == RecommendStatus.REMOVE ? DEFAULT_REMOVE_REASON : DEFAULT_KEEP_REASON;
-    }
-
-    // 품목명이 비어 있는 마스터 행 방어. (전체 19.5만 건 중 품목명 없는 행이 존재한다)
-    private String displayName(Product product) {
-        return StringUtils.hasText(product.getItemName()) ? product.getItemName() : "이름 미상 제품";
     }
 }
