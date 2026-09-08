@@ -7,7 +7,6 @@ import com.nyyb.nyybserver.analysis.data.dto.response.AnalysisSummaryDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmAnalysisResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmProductAnalysisDto;
 import com.nyyb.nyybserver.analysis.data.entity.Analysis;
-import com.nyyb.nyybserver.product.data.dto.response.ProductIngredientMappingDto;
 import com.nyyb.nyybserver.product.data.entity.Product;
 import com.nyyb.nyybserver.product.data.entity.UserProduct;
 import com.nyyb.nyybserver.product.data.entity.ProductIngredient;
@@ -18,7 +17,6 @@ import com.nyyb.nyybserver.analysis.data.repository.AnalysisRepository;
 import com.nyyb.nyybserver.product.data.repository.ProductIngredientRepository;
 import com.nyyb.nyybserver.product.data.repository.ProductRepository;
 import com.nyyb.nyybserver.product.data.repository.UserProductRepository;
-import com.nyyb.nyybserver.product.service.ProductService;
 import com.nyyb.nyybserver.ingredient.data.entity.Ingredient;
 import com.nyyb.nyybserver.routine.data.entity.Routine;
 import com.nyyb.nyybserver.routine.data.entity.RoutineItem;
@@ -55,6 +53,9 @@ public class AnalysisService {
     private static final String DEFAULT_KEEP_REASON = "겹치는 성분이 적어 유지를 고려해볼 수 있어요.";
     private static final String DEFAULT_REMOVE_REASON = "성분 구성이 겹쳐 제외를 고려해볼 수 있어요.";
 
+    // 마스터에 값이 없는 항목을 프롬프트에 표시할 때 쓰는 문구
+    private static final String NO_DATA = "(정보 없음)";
+
     // 응답 정렬: REMOVE 먼저, KEEP 나중 (analyze·상세 조회 공용)
     private static final Comparator<AnalysisProductDto> REMOVE_FIRST =
             Comparator.comparingInt(p -> p.recommended() == RecommendStatus.REMOVE ? 0 : 1);
@@ -63,7 +64,6 @@ public class AnalysisService {
     private final AnalysisRepository analysisRepository;
     private final ProductRepository productRepository;
     private final UserProductRepository userProductRepository;
-    private final ProductService productService;
     private final ProductIngredientRepository productIngredientRepository;
     private final RoutineRepository routineRepository;
     private final RoutineItemRepository routineItemRepository;
@@ -90,10 +90,6 @@ public class AnalysisService {
 
         // 프롬프트에 넣는 제품 순서는 productId 오름차순으로 고정한다.
         List<Long> orderedProductIds = productIds.stream().distinct().sorted().toList();
-
-        // 프롬프트에 실을 성분을 먼저 채운다. 마스터에 전성분이 아직 없는 제품만 웹 조회를 타고,
-        // 이미 매핑돼 있으면 ProductService가 LLM 호출 없이 기존 매핑을 그대로 쓴다.
-        orderedProductIds.forEach(this::ensureIngredientsMapped);
 
         String userMessage = buildUserMessage(orderedProductIds, productMap);
         log.info("OpenAI 요청 메시지:\n{}", userMessage);
@@ -269,7 +265,7 @@ public class AnalysisService {
         return products.stream().collect(Collectors.toMap(Product::getId, Function.identity()));
     }
 
-    // 제품별 productId + category + ocrText + 성분 -> 프롬프트 텍스트로 조립
+    // 제품별 productId + 품목명 + category + pH + 효능효과 + 성분 -> 프롬프트 텍스트로 조립
     private String buildUserMessage(List<Long> productIds, Map<Long, Product> productMap) {
         StringBuilder sb = new StringBuilder();
         sb.append("다음 제품들을 분석해 주세요.\n\n");
@@ -281,26 +277,29 @@ public class AnalysisService {
             sb.append("productName: ").append(product.getItemName()).append("\n");
             sb.append("categoryMain: ").append(product.getCategoryMainLabel()).append("\n");
             sb.append("categorySub: ").append(product.getCategorySubLabel()).append("\n");
+            sb.append("itemPh: ").append(formatValue(product.getItemPh())).append("\n");
+            sb.append("effects: ").append(formatEffects(product)).append("\n");
             sb.append("ingredients: ").append(formatIngredients(productId)).append("\n\n");
         }
 
         return sb.toString();
     }
 
-    /**
-     * 제품 마스터에 전성분이 없으면 웹에서 찾아 성분 마스터와 매핑해 둔다.
-     * 조회에 실패해도 분석 자체는 진행한다. (성분이 비면 프롬프트에 "인식된 성분 없음"으로 나간다)
-     */
-    private void ensureIngredientsMapped(Long productId) {
-        try {
-            ProductIngredientMappingDto mapping = productService.mapIngredientsFromWeb(productId);
-            if (!mapping.alreadyMapped()) {
-                log.info("전성분을 새로 매핑했습니다. productId={}, 매칭 {}/{}건",
-                        productId, mapping.matchedCount(), mapping.totalCount());
-            }
-        } catch (RuntimeException e) {
-            log.warn("전성분 조회에 실패해 기존 성분만으로 분석합니다. productId={}", productId, e);
+    // 마스터에 비어 있는 값이 "null"로 프롬프트에 나가지 않게 한다.
+    private String formatValue(String value) {
+        return StringUtils.hasText(value) ? value.strip() : NO_DATA;
+    }
+
+    // 효능효과 문서(DOC XML)에서 뽑은 문구를 성분 목록과 같은 들여쓰기 형태로 나열
+    private String formatEffects(Product product) {
+        List<String> effects = product.getEffectTexts();
+        if (effects.isEmpty()) {
+            return NO_DATA;
         }
+
+        return effects.stream()
+                .map(effect -> "\n  - " + effect)
+                .collect(Collectors.joining());
     }
 
     // 해당 제품의 성분을 "성분명(위험도) - 설명" 형태로 나열

@@ -8,6 +8,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * 화장품 제품 마스터(식약처 화장품 표시·광고 실증 자료 기준).
@@ -23,6 +25,10 @@ import java.time.Instant;
 public class Product {
 
     private static final String UNCLASSIFIED = "미분류";
+
+    // EE_DOC_DATA는 <PARAGRAPH>...<![CDATA[문구]]></PARAGRAPH> 형태의 DOC XML 원문이다.
+    // 태그까지 그대로 넘기면 프롬프트만 길어지므로 CDATA 안의 문구만 뽑아 쓴다.
+    private static final Pattern CDATA_TEXT = Pattern.compile("<!\\[CDATA\\[(.*?)]]>", Pattern.DOTALL);
 
     // 화장품보고일련번호. 식약처가 부여한 값이라 애플리케이션이 생성하지 않는다.
     @Id
@@ -93,6 +99,21 @@ public class Product {
 
     public String getCategorySubLabel() {
         return categorySub == null ? UNCLASSIFIED : categorySub.getDbValue();
+    }
+
+    /**
+     * 효능효과 문서(EE_DOC_DATA)에서 문구만 뽑아 반환한다.
+     * 원문이 없거나 CDATA가 하나도 없으면 빈 목록.
+     */
+    public List<String> getEffectTexts() {
+        if (eeDocData == null || eeDocData.isBlank()) {
+            return List.of();
+        }
+
+        return CDATA_TEXT.matcher(eeDocData).results()
+                .map(result -> result.group(1).strip())
+                .filter(text -> !text.isEmpty())
+                .toList();
     }
 
     // Y/N 문자열 컬럼은 값이 없을 수 있어(NULL) 없으면 false로 본다.
