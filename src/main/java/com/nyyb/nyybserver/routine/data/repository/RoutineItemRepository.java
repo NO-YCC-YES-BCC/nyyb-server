@@ -14,14 +14,14 @@ public interface RoutineItemRepository extends JpaRepository<RoutineItem, Long> 
 
     // 제품 fetch join (designRoutine에서 product 접근)
     @Query("select ri from RoutineItem ri " +
-            "join fetch ri.product " +
+            "join fetch ri.userProduct up join fetch up.product " +
             "where ri.routine.id = :routineId")
     List<RoutineItem> findByRoutineIdWithProduct(@Param("routineId") UUID routineId);
 
     // 루틴에 담긴 제품 수 (루틴아이템 1 : 제품 1)
     // Report detail: load products and the user's slot selections together.
     @Query("select distinct ri from RoutineItem ri " +
-            "join fetch ri.product " +
+            "join fetch ri.userProduct up join fetch up.product " +
             "left join fetch ri.selections " +
             "where ri.routine.id = :routineId")
     List<RoutineItem> findByRoutineIdWithProductAndSelections(@Param("routineId") UUID routineId);

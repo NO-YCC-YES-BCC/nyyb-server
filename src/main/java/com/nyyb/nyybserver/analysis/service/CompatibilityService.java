@@ -3,14 +3,14 @@ package com.nyyb.nyybserver.analysis.service;
 import com.nyyb.nyybserver.analysis.data.dto.request.CompatibilityRequestDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.CompatibilityResponseDto;
 import com.nyyb.nyybserver.analysis.data.dto.response.LlmCompatibilityResponseDto;
-import com.nyyb.nyybserver.analysis.data.entity.Product;
-import com.nyyb.nyybserver.analysis.data.entity.ProductIngredient;
+import com.nyyb.nyybserver.product.data.entity.Product;
+import com.nyyb.nyybserver.product.data.entity.ProductIngredient;
 import com.nyyb.nyybserver.analysis.data.enums.CompatibilityStatus;
 import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 import com.nyyb.nyybserver.analysis.data.enums.RoutineSlot;
-import com.nyyb.nyybserver.analysis.data.exception.ProductNotFoundException;
-import com.nyyb.nyybserver.analysis.data.repository.ProductIngredientRepository;
-import com.nyyb.nyybserver.analysis.data.repository.ProductRepository;
+import com.nyyb.nyybserver.product.data.exception.ProductNotFoundException;
+import com.nyyb.nyybserver.product.data.repository.ProductIngredientRepository;
+import com.nyyb.nyybserver.product.data.repository.ProductRepository;
 import com.nyyb.nyybserver.ingredient.data.dto.response.ProductIngredientMatchDto;
 import com.nyyb.nyybserver.ingredient.data.entity.Ingredient;
 import com.nyyb.nyybserver.ingredient.service.IngredientService;
@@ -56,7 +56,7 @@ public class CompatibilityService {
     public CompatibilityResponseDto compare(CompatibilityRequestDto request, Long userId) {
         Routine routine = routineRepository.findByIdAndUserId(request.getRoutineId(), userId)
                 .orElseThrow(RoutineNotFoundException::new);
-        Product candidate = productRepository.findByIdAndUserId(request.getProductId(), userId)
+        Product candidate = productRepository.findById(request.getProductId())
                 .orElseThrow(ProductNotFoundException::new);
 
         List<ProductIngredient> candidateIngredients =
@@ -93,10 +93,11 @@ public class CompatibilityService {
                     .toList();
 
             if (!activeSlots.isEmpty()) {
+                Product routineProduct = item.getUserProduct().getProduct();
                 products.add(new RoutineProductContext(
-                        item.getProduct(),
+                        routineProduct,
                         activeSlots,
-                        productIngredientRepository.findByProductIdWithIngredient(item.getProduct().getId())
+                        productIngredientRepository.findByProductIdWithIngredient(routineProduct.getId())
                 ));
             }
         }
@@ -123,7 +124,7 @@ public class CompatibilityService {
     }
 
     private boolean hasCandidateData(Product candidate, List<ProductIngredient> ingredients) {
-        return StringUtils.hasText(candidate.getOcrText()) || !ingredients.isEmpty();
+        return !ingredients.isEmpty();
     }
 
     private CompatibilityResponseDto unknownResponse(
@@ -132,7 +133,7 @@ public class CompatibilityService {
     ) {
         return new CompatibilityResponseDto(
                 candidate.getId(),
-                "새 제품",
+                candidate.getDisplayName(),
                 RecommendStatus.KEEP,
                 UNKNOWN_SUMMARY + " " + UNKNOWN_GUIDE,
                 ingredientMatch.ingredients(),
@@ -174,7 +175,7 @@ public class CompatibilityService {
         for (RoutineProductContext context : currentProducts) {
             List<String> overlapping = overlappingIngredients(candidateIngredients, context.ingredients());
             if (!overlapping.isEmpty()) {
-                lines.add(joinWithParticle(displayName(context.product()))
+                lines.add(joinWithParticle(context.product().getDisplayName())
                         + " " + overlapping.size() + "개 성분 중복");
             }
         }
@@ -219,10 +220,9 @@ public class CompatibilityService {
         StringBuilder message = new StringBuilder();
         message.append("=== 새 제품 ===\n")
                 .append("productId: ").append(candidate.getId()).append('\n')
-                .append("category: ").append(candidate.getCategory().describe()).append('\n')
-                .append("ocrText:\n<ocr-data>\n")
-                .append(candidate.getOcrText() == null ? "" : candidate.getOcrText())
-                .append("\n</ocr-data>\n")
+                .append("productName: ").append(candidate.getDisplayName()).append('\n')
+                .append("categoryMain: ").append(candidate.getCategoryMainLabel()).append('\n')
+                .append("categorySub: ").append(candidate.getCategorySubLabel()).append('\n')
                 .append("matchedIngredients:")
                 .append(formatIngredients(candidateIngredients))
                 .append("\n\n=== 현재 루틴 ===\n")
@@ -232,8 +232,9 @@ public class CompatibilityService {
             Product product = context.product();
             message.append("--- 기존 루틴 제품 ---\n")
                     .append("productId: ").append(product.getId()).append('\n')
-                    .append("productName: ").append(displayName(product)).append('\n')
-                    .append("category: ").append(product.getCategory().describe()).append('\n')
+                    .append("productName: ").append(product.getDisplayName()).append('\n')
+                    .append("categoryMain: ").append(product.getCategoryMainLabel()).append('\n')
+                    .append("categorySub: ").append(product.getCategorySubLabel()).append('\n')
                     .append("activeSlots: ").append(formatSlots(context.slots())).append('\n')
                     .append("ingredients:").append(formatIngredients(context.ingredients()))
                     .append("\n\n");
@@ -279,12 +280,6 @@ public class CompatibilityService {
 
     private String normalizeName(String value) {
         return value.replaceAll("[\\s_-]", "").toLowerCase(Locale.ROOT);
-    }
-
-    private String displayName(Product product) {
-        return StringUtils.hasText(product.getProductName())
-                ? product.getProductName()
-                : product.getCategory().name() + " " + product.getId();
     }
 
     private String safeText(String value, String fallback) {

@@ -1,10 +1,10 @@
 package com.nyyb.nyybserver.ingredient.service;
 
-import com.nyyb.nyybserver.analysis.data.entity.Product;
-import com.nyyb.nyybserver.analysis.data.entity.ProductIngredient;
-import com.nyyb.nyybserver.analysis.data.exception.ProductNotFoundException;
-import com.nyyb.nyybserver.analysis.data.repository.ProductIngredientRepository;
-import com.nyyb.nyybserver.analysis.data.repository.ProductRepository;
+import com.nyyb.nyybserver.product.data.entity.Product;
+import com.nyyb.nyybserver.product.data.entity.ProductIngredient;
+import com.nyyb.nyybserver.product.data.exception.ProductNotFoundException;
+import com.nyyb.nyybserver.product.data.repository.ProductIngredientRepository;
+import com.nyyb.nyybserver.product.data.repository.ProductRepository;
 import com.nyyb.nyybserver.ingredient.data.dto.response.AllergicDto;
 import com.nyyb.nyybserver.ingredient.data.dto.response.IngredientDto;
 import com.nyyb.nyybserver.ingredient.data.dto.response.IngredientSummaryDto;
@@ -144,13 +144,13 @@ public class IngredientService {
 
         return new ProductIngredientMatchDto(
                 product.getId(),
-                product.getProductName(),
+                product.getDisplayName(),
                 ingredientsById.values().stream().map(IngredientDto::from).toList(),
                 matchedAllergicsById.values().stream().map(AllergicDto::from).toList()
         );
     }
 
-    // 소문자화 + 모든 공백 제거 (IngredientIndex와 동일한 정규화 규칙)
+    // 소문자화 + 모든 공백 제거
     private String normalize(String text) {
         if (text == null) {
             return "";

@@ -1,4 +1,4 @@
-package com.nyyb.nyybserver.analysis.data.entity;
+package com.nyyb.nyybserver.product.data.entity;
 
 import com.nyyb.nyybserver.ingredient.data.entity.Ingredient;
 import jakarta.persistence.*;

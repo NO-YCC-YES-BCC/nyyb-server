@@ -1,10 +1,11 @@
 package com.nyyb.nyybserver.report.service;
 
-import com.nyyb.nyybserver.analysis.data.entity.Product;
-import com.nyyb.nyybserver.analysis.data.entity.ProductIngredient;
+import com.nyyb.nyybserver.product.data.entity.Product;
+import com.nyyb.nyybserver.product.data.entity.UserProduct;
+import com.nyyb.nyybserver.product.data.entity.ProductIngredient;
 import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 import com.nyyb.nyybserver.analysis.data.enums.RoutineSlot;
-import com.nyyb.nyybserver.analysis.data.repository.ProductIngredientRepository;
+import com.nyyb.nyybserver.product.data.repository.ProductIngredientRepository;
 import com.nyyb.nyybserver.ingredient.data.entity.Ingredient;
 import com.nyyb.nyybserver.report.data.dto.response.ReportDayDto;
 import com.nyyb.nyybserver.report.data.dto.response.ReportIngredientDto;
@@ -80,13 +81,15 @@ public class ReportService {
     }
 
     private ReportProductDto toProduct(RoutineItem item, RoutineSlot slot) {
-        Product product = item.getProduct();
+        UserProduct userProduct = item.getUserProduct();
+        Product product = userProduct.getProduct();
         RecommendStatus recommendation = recommendationFor(item, slot);
 
         return new ReportProductDto(
-                product.getId(),
-                product.getCategory(),
-                product.getProductName(),
+                userProduct.getId(),
+                product.getCategoryMainLabel(),
+                product.getCategorySubLabel(),
+                product.getDisplayName(),
                 recommendation,
                 recommendationReasonFor(item, recommendation),
                 selectedFor(item, slot),

@@ -58,17 +58,19 @@ public class ChatClientConfig {
      * @param responseType 구조화 출력으로 받을 응답 DTO 타입
      */
     private OpenAiChatOptions strictJsonOptions(String name, Class<?> responseType) {
-        ResponseFormat responseFormat = ResponseFormat.builder()
+        return OpenAiChatOptions.builder()
+                .responseFormat(strictJsonSchema(name, responseType))
+                .build();
+    }
+
+    private ResponseFormat strictJsonSchema(String name, Class<?> responseType) {
+        return ResponseFormat.builder()
                 .type(ResponseFormat.Type.JSON_SCHEMA)
                 .jsonSchema(ResponseFormat.JsonSchema.builder()
                         .name(name)
                         .schema(new BeanOutputConverter<>(responseType).getJsonSchemaMap())
                         .strict(true)
                         .build())
-                .build();
-
-        return OpenAiChatOptions.builder()
-                .responseFormat(responseFormat)
                 .build();
     }
 }
