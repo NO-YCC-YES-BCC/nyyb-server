@@ -35,7 +35,8 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
         query.multiselect(
                 root.get("id").alias("id"),
                 root.get("nameKo").alias("nameKo"),
-                root.get("name").alias("name")
+                root.get("name").alias("name"),
+                root.get("brand").alias("brand")
         );
 
         Predicate predicate = spec.toPredicate(root, query, cb);
@@ -54,7 +55,8 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom {
                 .stream()
                 .map(row -> new ProductSuggestionDto(
                         row.get("id", Long.class),
-                        Product.displayNameOf(row.get("nameKo", String.class), row.get("name", String.class))
+                        Product.displayNameOf(row.get("nameKo", String.class), row.get("name", String.class)),
+                        row.get("brand", String.class)
                 ))
                 .toList();
     }
