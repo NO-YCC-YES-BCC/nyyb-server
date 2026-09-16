@@ -90,6 +90,14 @@ public class Product {
      * 카테고리 라벨과 마찬가지로 여기서 기본값을 채운다.
      */
     public String getDisplayName() {
+        return displayNameOf(nameKo, name);
+    }
+
+    /**
+     * 엔티티를 통째로 읽지 않고 이름 컬럼만 조회하는 곳(자동완성 등)에서도 같은 규칙을 쓰도록
+     * 이름 선택 규칙만 따로 떼어 둔다.
+     */
+    public static String displayNameOf(String nameKo, String name) {
         if (nameKo != null && !nameKo.isBlank()) {
             return nameKo.strip();
         }
