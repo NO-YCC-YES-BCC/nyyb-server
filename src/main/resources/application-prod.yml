@@ -1,3 +1,8 @@
+# 리버스 프록시(nginx) 뒤에서 동작하므로 X-Forwarded-* 를 신뢰한다.
+# 이 설정이 없으면 Swagger 서버 URL이 http 로 생성되어 브라우저가 혼합 콘텐츠로 차단한다.
+server:
+  forward-headers-strategy: framework
+
 # 운영 설정 — 비밀값은 전부 환경변수로 주입 (이 파일은 커밋됨, 값 직접 기입 금지)
 spring:
   datasource:
@@ -5,6 +10,11 @@ spring:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
   jpa:
     hibernate:
@@ -32,17 +42,5 @@ kakao:
   client-id: ${KAKAO_CLIENT_ID}
   client-secret: ${KAKAO_CLIENT_SECRET}
   redirect-uri: ${KAKAO_REDIRECT_URI}
+  admin-key: ${KAKAO_ADMIN_KEY}
 
-clova-ocr:
-  api-url: ${CLOVA_OCR_API_URL}
-  secret-key: ${CLOVA_OCR_SECRET_KEY}
-
-cloud:
-  aws:
-    s3:
-      bucket: ${AWS_S3_BUCKET}
-    region:
-      static: ${AWS_REGION:ap-northeast-2}
-    credentials:
-      access-key: ${AWS_ACCESS_KEY}
-      secret-key: ${AWS_SECRET_KEY}

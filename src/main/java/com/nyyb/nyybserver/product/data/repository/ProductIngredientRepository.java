@@ -1,6 +1,6 @@
-package com.nyyb.nyybserver.analysis.data.repository;
+package com.nyyb.nyybserver.product.data.repository;
 
-import com.nyyb.nyybserver.analysis.data.entity.ProductIngredient;
+import com.nyyb.nyybserver.product.data.entity.ProductIngredient;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

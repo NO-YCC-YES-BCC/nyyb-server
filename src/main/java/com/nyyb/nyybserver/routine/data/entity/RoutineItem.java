@@ -1,6 +1,6 @@
 package com.nyyb.nyybserver.routine.data.entity;
 
-import com.nyyb.nyybserver.analysis.data.entity.Product;
+import com.nyyb.nyybserver.product.data.entity.UserProduct;
 import com.nyyb.nyybserver.analysis.data.enums.RecommendStatus;
 import com.nyyb.nyybserver.analysis.data.enums.RoutineSlot;
 import jakarta.persistence.*;
@@ -30,10 +30,10 @@ public class RoutineItem {
     @JoinColumn(name = "routine_id", nullable = false)
     private Routine routine;
 
-    // 제품 1 : 루틴아이템 0..1 — 한 제품은 최대 하나의 루틴 아이템으로만 담김
+    // 사용자 제품 1 : 루틴아이템 0..1 — 한 사용자 제품은 최대 하나의 루틴 아이템으로만 담김
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", unique = true, nullable = false)
-    private Product product;
+    @JoinColumn(name = "user_product_id", unique = true, nullable = false)
+    private UserProduct userProduct;
 
     @Enumerated(EnumType.STRING)
     @Column
@@ -83,5 +83,18 @@ public class RoutineItem {
                 .slot(slot)
                 .action(action)
                 .build());
+    }
+
+    /**
+     * 해당 슬롯에 대해 유저가 저장한 선택(KEEP/REMOVE)을 반환. 저장 전이면 null.
+     * 조회 API가 LLM 추천 대신 유저 선택을 우선 반영할 때 사용한다.
+     */
+    public RecommendStatus getUserSelection(RoutineSlot slot) {
+        for (RoutineItemSelection selection : selections) {
+            if (selection.getSlot() == slot) {
+                return selection.getAction();
+            }
+        }
+        return null;
     }
 }
