@@ -1,6 +1,7 @@
 package com.nyyb.nyybserver.product.service;
 
 import com.nyyb.nyybserver.product.data.dto.response.ProductSearchDto;
+import com.nyyb.nyybserver.product.data.dto.response.ProductSuggestionDto;
 import com.nyyb.nyybserver.product.data.entity.Product;
 import com.nyyb.nyybserver.product.data.repository.ProductRepository;
 import com.nyyb.nyybserver.product.data.repository.ProductSpecifications;
@@ -25,8 +26,25 @@ import java.util.List;
 public class ProductService {
 
     private static final int MAX_TOKENS = 5;
+    private static final int SUGGESTION_MAX_LIMIT = 20;
 
     private final ProductRepository productRepository;
+
+    /**
+     * 검색창 자동완성. 검색과 같은 조건으로 찾되 목록에 필요한 id·이름만 가져온다.
+     * 입력 한 글자마다 호출될 수 있어 건수를 {@value #SUGGESTION_MAX_LIMIT} 건으로 제한한다.
+     */
+    @Transactional(readOnly = true)
+    public List<ProductSuggestionDto> suggest(String keyword, int limit) {
+        List<String> tokens = tokenize(keyword);
+        if (tokens.isEmpty()) {
+            return List.of();
+        }
+
+        int capped = Math.clamp(limit, 1, SUGGESTION_MAX_LIMIT);
+        return productRepository.findSuggestions(
+                ProductSpecifications.searchKeyContainsAllTokens(tokens), capped);
+    }
 
     @Transactional(readOnly = true)
     public List<ProductSearchDto> search(String keyword, Pageable pageable) {
