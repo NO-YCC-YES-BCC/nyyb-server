@@ -75,6 +75,11 @@ public class Product {
     @Column(name = "category_sub", columnDefinition = CategorySub.COLUMN_DEFINITION)
     private CategorySub categorySub; // 카테고리 소분류
 
+    // product_ingredient 집계값을 미리 저장해 둔 것. 목록에서 제품마다 COUNT 하지 않으려고 둔다.
+    // 수집 파이프라인이 성분을 다시 넣으면 이 값도 함께 갱신해야 한다.
+    @Column(name = "ingredient_count", nullable = false)
+    private int ingredientCount;
+
     // 분류가 없는 행이 있어 라벨을 뽑는 곳마다 방어하지 않도록 여기서 처리한다.
     public String getCategoryMainLabel() {
         return categoryMain == null ? UNCLASSIFIED : categoryMain.getDbValue();

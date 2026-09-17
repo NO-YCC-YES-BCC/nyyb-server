@@ -1,15 +1,20 @@
 package com.nyyb.nyybserver.product.controller;
 
+import com.nyyb.nyybserver.product.data.dto.request.ProductRequestDto;
 import com.nyyb.nyybserver.product.data.dto.response.ProductSearchDto;
 import com.nyyb.nyybserver.product.data.dto.response.ProductSuggestionDto;
+import com.nyyb.nyybserver.product.service.ProductRequestService;
 import com.nyyb.nyybserver.product.service.ProductService;
 import com.nyyb.nyybserver.common.dto.PageRequestDto;
+import com.nyyb.nyybserver.common.security.SecurityUtil;
 import com.nyyb.nyybserver.common.response.GlobalResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -23,6 +28,7 @@ import java.util.List;
 public class ProductController {
 
     private final ProductService productSearchService;
+    private final ProductRequestService productRequestService;
 
     // 제품명 검색. 공백으로 구분한 여러 단어를 모두 포함하는 제품을 찾는다. (예: keyword=브랜드명 크림)
     @GetMapping
@@ -42,5 +48,13 @@ public class ProductController {
             @RequestParam(defaultValue = "10") int limit
     ) {
         return GlobalResponse.ok(productSearchService.suggest(keyword, limit));
+    }
+
+    // 검색해도 안 나오는 제품을 사용자가 알려 오는 창구. 요청을 쌓아만 두고 수집 대상 반영은 사람이 판단한다.
+    @Operation(summary = "제품 추가 등록 요청", description = "검색 결과가 없을 때 사용자가 제품 등록을 요청한다.")
+    @PostMapping("/requests")
+    public GlobalResponse<Void> requestProduct(@RequestBody ProductRequestDto request) {
+        productRequestService.register(request, SecurityUtil.getUserId());
+        return GlobalResponse.ok();
     }
 }
