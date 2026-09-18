@@ -164,6 +164,7 @@ public class AnalysisService {
     public List<AnalysisSummaryDto> getAnalyses(Long userId, Pageable pageable) {
         List<Analysis> analyses = analysisRepository.findByUserIdOrderByCreatedAtDescIdDesc(userId, pageable);
         Map<UUID, List<UserProductRepository.RecommendCount>> countsByAnalysisId = summarizeProductCounts(analyses);
+        Map<UUID, Integer> scoresByAnalysisId = findRoutineScores(analyses);
 
         return analyses.stream()
                 .map(analysis -> {
@@ -176,9 +177,29 @@ public class AnalysisService {
                             .filter(count -> count.getRecommended() == RecommendStatus.REMOVE)
                             .mapToLong(UserProductRepository.RecommendCount::getCount)
                             .sum();
-                    return AnalysisSummaryDto.from(analysis, productCount, removeCount);
+                    return AnalysisSummaryDto.from(analysis, productCount, removeCount,
+                            scoresByAnalysisId.get(analysis.getId()));
                 })
                 .toList();
+    }
+
+    // 분석별 루틴 점수를 한 번에 조회 (N+1 방지). 루틴 설계 전이면 점수가 null 이라 값이 null 로 들어간다.
+    // 분석 1 : 루틴 1 이지만 유니크 제약이 없어, 생성순으로 받아 분석마다 가장 먼저 만들어진 루틴 것만 쓴다.
+    // (분석 상세 조회의 findFirstByAnalysisIdOrderByCreatedAtAsc 와 같은 기준)
+    private Map<UUID, Integer> findRoutineScores(List<Analysis> analyses) {
+        if (analyses.isEmpty()) {
+            return Map.of();
+        }
+
+        List<UUID> analysisIds = analyses.stream().map(Analysis::getId).toList();
+        Map<UUID, Integer> scores = new HashMap<>();
+        for (RoutineRepository.AnalysisScore row : routineRepository.findScoresByAnalysisIds(analysisIds)) {
+            // null 점수도 "가장 먼저 만들어진 루틴"의 값이므로 덮어쓰지 않도록 키 존재로 판단한다.
+            if (!scores.containsKey(row.getAnalysisId())) {
+                scores.put(row.getAnalysisId(), row.getScore());
+            }
+        }
+        return scores;
     }
 
     // 분석 목록의 productId를 한 번에 집계 조회해 analysisId별로 그룹핑 (N+1 방지)
