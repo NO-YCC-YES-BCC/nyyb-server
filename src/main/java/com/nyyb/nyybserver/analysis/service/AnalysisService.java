@@ -234,6 +234,7 @@ public class AnalysisService {
         List<AnalysisProductDto> products = userProductRepository.findByAnalysisIdWithProduct(analysisId).stream()
                 .map(userProduct -> new AnalysisProductDto(
                         userProduct.getId(),
+                        userProduct.getProduct().getId(),
                         userProduct.getProduct().getDisplayName(),
                         userProduct.getRecommended(),
                         userProduct.getRecommendReason()))
@@ -343,9 +344,11 @@ public class AnalysisService {
             throw new IllegalArgumentException("요청에 없는 productId: " + result.productId());
         }
 
+        Product product = productMap.get(result.productId());
         return new AnalysisProductDto(
                 userProducts.get(result.productId()).getId(),
-                productMap.get(result.productId()).getDisplayName(),
+                product.getId(),
+                product.getDisplayName(),
                 result.recommended(),
                 resolveReason(result));
     }
