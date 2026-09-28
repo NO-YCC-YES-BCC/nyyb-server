@@ -170,6 +170,52 @@ class CompatibilityServiceTest {
     }
 
     @Test
+    void compareKeepsCandidateWithoutCallingLlmWhenRoutineHasNoSameCategoryMainProduct() {
+        Long userId = 7L;
+        UUID routineId = UUID.randomUUID();
+
+        Routine routine = Routine.builder().id(routineId).title("현재 루틴").build();
+        Product candidate = product(200L, "테스트 클렌징폼", CategoryMain.CLEANSING, CategorySub.CLEANSING_FOAM);
+        Product serum = product(101L, "기존 세럼");
+        RoutineItem serumItem = routineItem(
+                routine,
+                serum,
+                RecommendStatus.KEEP,
+                RoutineItemSelection.builder()
+                        .slot(RoutineSlot.MORNING)
+                        .action(RecommendStatus.KEEP)
+                        .build()
+        );
+
+        Ingredient glycerin = ingredient(1L, "글리세린");
+        ProductIngredientMatchDto ingredientMatch =
+                new ProductIngredientMatchDto(candidate.getId(), "테스트 클렌징폼", List.of(), List.of());
+
+        when(routineRepository.findByIdAndUserId(routineId, userId))
+                .thenReturn(Optional.of(routine));
+        when(productRepository.findById(candidate.getId()))
+                .thenReturn(Optional.of(candidate));
+        when(productIngredientRepository.findByProductIdWithIngredient(candidate.getId()))
+                .thenReturn(List.of(productIngredient(candidate, glycerin)));
+        when(routineItemRepository.findByRoutineIdWithProductAndSelections(routineId))
+                .thenReturn(List.of(serumItem));
+        when(productIngredientRepository.findByProductIdWithIngredient(serum.getId()))
+                .thenReturn(List.of(productIngredient(serum, glycerin)));
+        when(ingredientService.match(candidate.getId())).thenReturn(ingredientMatch);
+
+        CompatibilityRequestDto request = new CompatibilityRequestDto();
+        request.setProductId(candidate.getId());
+        request.setRoutineId(routineId);
+
+        CompatibilityResponseDto response = compatibilityService.compare(request, userId);
+
+        assertEquals(RecommendStatus.KEEP, response.recommended());
+        assertTrue(response.recommendReason().endsWith(
+                "현재 루틴에 같은 클렌징 대분류 제품이 없어 추가를 고려해볼 수 있어요."));
+        verify(compatibilityAnalyzer, never()).analyze(anyString());
+    }
+
+    @Test
     void compareChecksForCurrentRoutineBeforeLoadingProduct() {
         Long userId = 99L;
         CompatibilityRequestDto request = new CompatibilityRequestDto();
@@ -186,11 +232,15 @@ class CompatibilityServiceTest {
     }
 
     private Product product(Long id, String productName) {
+        return product(id, productName, CategoryMain.SKIN_CARE, CategorySub.SERUM);
+    }
+
+    private Product product(Long id, String productName, CategoryMain categoryMain, CategorySub categorySub) {
         return Product.builder()
                 .id(id)
                 .nameKo(productName)
-                .categoryMain(CategoryMain.SKIN_CARE)
-                .categorySub(CategorySub.SERUM)
+                .categoryMain(categoryMain)
+                .categorySub(categorySub)
                 .build();
     }
 

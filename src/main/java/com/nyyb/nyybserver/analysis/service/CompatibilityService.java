@@ -72,11 +72,18 @@ public class CompatibilityService {
             return unknownResponse(candidate, ingredientMatch);
         }
 
+        // 비교 대상 한정(같은 대분류)은 LLM에 맡기면 가끔 무시되므로 서버에서 미리 거른다.
+        List<RoutineProductContext> comparableProducts = sameCategoryMain(candidate, currentProducts);
+        if (comparableProducts.isEmpty()) {
+            return toResponse(candidate, candidateIngredients, currentProducts,
+                    noComparableAnalysis(candidate), ingredientMatch);
+        }
+
         log.info("신규 제품 궁합 분석을 요청합니다. userId={}, routineId={}, productId={}",
                 userId, routine.getId(), candidate.getId());
 
         LlmCompatibilityResponseDto analysis = compatibilityAnalyzer.analyze(
-                buildUserMessage(candidate, candidateIngredients, routine, currentProducts)
+                buildUserMessage(candidate, candidateIngredients, routine, comparableProducts)
         );
 
         return toResponse(candidate, candidateIngredients, currentProducts, analysis, ingredientMatch);
@@ -102,6 +109,34 @@ public class CompatibilityService {
             }
         }
         return products;
+    }
+
+    private List<RoutineProductContext> sameCategoryMain(
+            Product candidate,
+            List<RoutineProductContext> currentProducts
+    ) {
+        if (candidate.getCategoryMain() == null) {
+            return List.of();
+        }
+        return currentProducts.stream()
+                .filter(context -> context.product().getCategoryMain() == candidate.getCategoryMain())
+                .toList();
+    }
+
+    // 같은 대분류 제품이 루틴에 없으면 겹칠 역할이 없으므로 LLM 없이 GOOD으로 확정한다.
+    private LlmCompatibilityResponseDto noComparableAnalysis(Product candidate) {
+        String summary = candidate.getCategoryMain() == null
+                ? "현재 루틴에 같은 대분류 제품이 없어 추가를 고려해볼 수 있어요."
+                : "현재 루틴에 같은 " + candidate.getCategoryMainLabel() + " 대분류 제품이 없어 추가를 고려해볼 수 있어요.";
+        return new LlmCompatibilityResponseDto(
+                candidate.getDisplayName(),
+                CompatibilityStatus.GOOD,
+                95,
+                RoutineSlot.BOTH,
+                summary,
+                null,
+                List.of()
+        );
     }
 
     private boolean isActive(RoutineItem item, RoutineSlot slot, boolean hasSavedSelections) {
@@ -215,7 +250,7 @@ public class CompatibilityService {
             Product candidate,
             List<ProductIngredient> candidateIngredients,
             Routine routine,
-            List<RoutineProductContext> currentProducts
+            List<RoutineProductContext> comparableProducts
     ) {
         StringBuilder message = new StringBuilder();
         message.append("=== 새 제품 ===\n")
@@ -225,10 +260,10 @@ public class CompatibilityService {
                 .append("categorySub: ").append(candidate.getCategorySubLabel()).append('\n')
                 .append("matchedIngredients:")
                 .append(formatIngredients(candidateIngredients))
-                .append("\n\n=== 현재 루틴 ===\n")
+                .append("\n\n=== 현재 루틴 중 같은 대분류 제품 ===\n")
                 .append("routineId: ").append(routine.getId()).append("\n\n");
 
-        for (RoutineProductContext context : currentProducts) {
+        for (RoutineProductContext context : comparableProducts) {
             Product product = context.product();
             message.append("--- 기존 루틴 제품 ---\n")
                     .append("productId: ").append(product.getId()).append('\n')
